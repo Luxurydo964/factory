@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>1688无痕文胸top20</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="app" class="min-h-screen p-4 md:p-8">
+    <header class="max-w-6xl mx-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl md:text-3xl font-bold">1688无痕文胸top20</h1>
+        <div>
+          <input v-model="q" placeholder="搜索名称 / 类别 / 标签" class="border rounded px-3 py-1 w-60" />
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto grid gap-6 md:grid-cols-3 sm:grid-cols-2 grid-cols-1">
+      <section class="col-span-1 md:col-span-2">
+        <div class="bg-white shadow rounded p-4">
+          <div v-if="filtered.length===0" class="py-8 text-center text-gray-500">没有匹配的工厂</div>
+          <ul>
+            <li v-for="(f, idx) in paged" :key="idx" class="border-b last:border-b-0">
+              <div class="flex items-center p-3 hover:bg-gray-50">
+                <div class="w-20 h-12 flex-shrink-0 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
+                  <img v-if="f.images && f.images.length" :src="f.images[0]" alt="logo" class="w-full object-cover" />
+                  <svg v-else xmlns='http://www.w3.org/2000/svg' class='w-6 h-6 text-gray-400' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 7a4 4 0 014-4h10a4 4 0 014 4v10a4 4 0 01-4 4H7a4 4 0 01-4-4V7z' /></svg>
+                </div>
+                <div class="ml-3 flex-1">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="font-semibold text-lg">{{ f.name || "(无名称)" }}</div>
+                      <div class="text-sm text-gray-600">{{ f.main_categories }}</div>
+                    </div>
+                    <div class="text-right text-sm text-gray-600">
+                      <div>联系方式</div>
+                      <div class="font-medium">{{ f.phone }}</div>
+                    </div>
+                  </div>
+                  <div class="mt-2 text-sm text-gray-500">
+                    标签: <span v-if="f.tags">{{ f.tags }}</span><span v-else>—</span>
+                  </div>
+                  <div class="mt-2">
+                    <button @click="openDetail(f)" class="px-3 py-1 rounded bg-blue-600 text-white text-sm">详情</button>
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+
+          <div class="flex items-center justify-between mt-4">
+            <div class="text-sm text-gray-600">共 {{ filtered.length }} 条</div>
+            <div class="space-x-2">
+              <button @click="prevPage" :disabled="page===1" class="px-2 py-1 border rounded disabled:opacity-50">上一页</button>
+              <button @click="nextPage" :disabled="page>=pages" class="px-2 py-1 border rounded disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <aside class="col-span-1">
+        <div class="bg-white shadow rounded p-4">
+          <h2 class="font-semibold mb-2">筛选</h2>
+          <div class="mb-2">
+            <label class="text-sm text-gray-600">页面大小</label>
+            <select v-model.number="perPage" class="w-full border rounded px-2 py-1">
+              <option v-for="n in [10,20,50,100]" :value="n">{{ n }}</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="text-sm text-gray-600">只显示有图片</label>
+            <input type="checkbox" v-model="hasImage" class="ml-2" />
+          </div>
+          <div class="text-sm text-gray-600 mt-4">点击列表中“详情”查看全部信息并跳转。</div>
+        </div>
+      </aside>
+    </main>
+
+    <div v-if="detail" class="fixed inset-0 bg-black/40 flex items-start md:items-center justify-center p-4 z-50">
+      <div class="bg-white rounded shadow max-w-4xl w-full max-h-[90vh] overflow-auto">
+        <div class="flex items-center justify-between p-4 border-b">
+          <div class="text-lg font-semibold">{{ detail.name || "(无名称)" }}</div>
+          <div><button @click="detail=null" class="px-3 py-1 border rounded">关闭</button></div>
+        </div>
+        <div class="p-4 grid gap-4 md:grid-cols-3">
+          <div class="md:col-span-2">
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">联系方式</div>
+              <div class="font-medium text-lg">{{ detail.phone }}</div>
+              <div class="text-sm text-gray-500 mt-2" v-if="detail.raw.contact_info">{{ detail.raw.contact_info }}</div>
+            </div>
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">主营目录</div>
+              <div class="font-medium">{{ detail.main_categories }}</div>
+            </div>
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">标签</div>
+              <div>{{ detail.tags }}</div>
+            </div>
+
+            <div class="mb-4" v-if="Object.keys(detail.raw).length">
+              <h3 class="font-semibold mb-2">完整信息</h3>
+              <table class="min-w-full text-sm">
+                <tbody>
+                  <tr v-for="(v,k) in detail.raw" :key="k" class="border-t">
+                    <td class="py-2 align-top font-medium w-40 text-gray-700">{{ k }}</td>
+                    <td class="py-2" v-html="formatValue(v)"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="md:col-span-1">
+            <div class="space-y-3">
+              <div v-if="detail.images && detail.images.length">
+                <div class="text-sm text-gray-600 mb-2">图片</div>
+                <div class="grid grid-cols-1 gap-2">
+                  <img v-for="(u,i) in detail.images" :key="i" :src="u" class="w-full h-40 object-contain bg-gray-100 p-1" />
+                </div>
+              </div>
+              <div v-else class="text-sm text-gray-500">没有图片</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+/* 数据占位符 — 生成时由 Python 替换为 JSON 列表 */
+const data = [{"name": "广东维尔美制衣有限公司", "phone": "15917919988", "main_categories": "主营:|软支撑文胸|无痕文胸|女士三角裤", "tags": "2025上榜四钻工厂|入围女士三角裤服务榜 第15名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-1734173162&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=848029346997,713228857534,623796878702,683842893405,627662577405,761538976426,660229088898,729368404280,624504563422,848581460947&aHdkaW5n_isUseGray=true", "name": "广东维尔美制衣有限公司", "tags": "2025上榜四钻工厂|入围女士三角裤服务榜 第15名", "main_categories": "主营:|软支撑文胸|无痕文胸|女士三角裤", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2002.12.12\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"12212m²\",\"员工总数\":\"287人\"}", "cooperation": "{\"定制起订量\":\"10000件\",\"贴牌起订量\":\"500件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工 包工包料\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "广东维尔美制衣有限公司是一家集设计、生产、营销为一体的专业内衣公司，创始于1983年，拥有三十多年是生产研发经验，生产产品涉及文胸、内裤、保暖内衣、美体塑身衣、健康功能内衣、家居服、泳衣等多个领域。公司视产品为生命，以“追求卓越开拓创新”为企业信念，严把质量关，严格按照国际质量标准进行生产和管理，保障产品品质，以诚信、实力和产品质量获得业界的认可。广东维尔美制衣有限公司旗下有万康、维尔美、零压生活三大自主品牌，现有员工800多人，拥有全套德、日进口生产设备、生产线800多台套，占地约50000余平方米，下设深圳营销分公司。\n本公司现提供内衣加工、内衣贴牌、内衣OEM服务。欢迎各界朋友莅临参观、指导和业务洽谈！收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-1734173162", "shop_url": "https://lingyashenghuo.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 400 0754528\",\"手机\":\"15917919988\",\"传真\":\"86 0754 84481528\",\"地址\":\"广东省汕头市潮南区陈店镇洋新村广东维尔美制衣有限公司\"}"}}, {"name": "汕头市潮南区陈店如依美针织内衣厂", "phone": "13825873694", "main_categories": "", "tags": "入围背心式文胸服务榜 第1名|入围无痕文胸热度榜 第3名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-22005557207622c320&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=911549966449,724046904418,696662181396,632231511627,633810712549,676122306162,911236815098,835546732934,946929307669,944907922851&aHdkaW5n_isUseGray=true", "name": "汕头市潮南区陈店如依美针织内衣厂", "tags": "入围背心式文胸服务榜 第1名|入围无痕文胸热度榜 第3名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2018.11.21\",\"年交易额\":\"50~100万\",\"员工总数\":\"5人以下\"}", "cooperation": "{\"定制起订量\":\"0\",\"贴牌起订量\":\"0\",\"接外贸订单\":\"不支持\",\"开票点数\":\"10%\",\"增值税发票\":\"有\"}", "showroom": "如依美服饰主营女装文胸等产品专业生产加工的公司，拥有完整、科学的质量管理体系。月生产量达到50万件左右，我们拥有最先进的电脑裁床，验布机、松布机，台式及手提式缝纫针检测器，这几年来我们始终如一地坚持以人为本、诚信务实、做好每一道工序、做好每一件产品为原则，以合理的价格、优秀的品质赢取与每位客户的合作机会。诚信、实力和产品质量获得业界的认可。欢迎各界朋友莅临参观、指导和业务洽谈。公司采用最大厂家的高品质面料，设计时尚典雅的款式，精细考究的做工在国内电商享有很高的声誉，本公司在国内有完善的销售网络。公司凭借诚信、创新、高效、客户导向的企业理念和客户及布料、辅料等上游供应厂家保持着良好的合作关系。公司自创建以来始终坚守“信誉第一，客户至上”的经营理念；尊崇诚信和质量；保持平等和友谊；用于服务消费者和供应商两个上帝。公司将一如继往的为新老客户提供优质的产品和一流的服务，竭诚欢迎新老客户的光临和惠顾收起更多", "sgs_report": "", "shop_url": "https://ruyimei.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0754 86644567\",\"手机\":\"13825873694\",\"传真\":\"86 0754 13825873694\",\"地址\":\"广东省汕头市潮南区陈店镇溪口\"}"}}, {"name": "汕头市潮南区陈店玉姿蝶针织内衣厂", "phone": "18200625782", "main_categories": "主营:|无钢圈文胸|无痕文胸|调整型文胸", "tags": "2025上榜一钻工厂|入围调整型文胸实力榜 第3名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-40805274787101d&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=934574897290,934015638117,930640825385,895141505698,856528988451,930085646550,898196561813,859011145277,947042206195,942863234765&aHdkaW5n_isUseGray=true", "name": "汕头市潮南区陈店玉姿蝶针织内衣厂", "tags": "2025上榜一钻工厂|入围调整型文胸实力榜 第3名", "main_categories": "主营:|无钢圈文胸|无痕文胸|调整型文胸", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2017.09.25\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"3250m²\",\"员工总数\":\"89人\"}", "cooperation": "{\"定制起订量\":\"10000件\",\"贴牌起订量\":\"10000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 来样加工 来图加工 包工包料\",\"开票点数\":\"1%\",\"增值税发票\":\"有\"}", "showroom": "汕头市潮南区陈店玉姿蝶针织内衣厂设在\"中国内衣城——汕头市陈店镇\"。自成立以来我厂一直秉承着以\"诚信\"服务客户,以\"质\"做好产品。集女性内衣开发、设计、生产、服务、营销进出口为一体的民营企业 。在资源、技术、人脉多层优势的结合下，玉姿蝶内衣厂得到飞速地发展，取得不斐的成绩，并通过优质的生产设备，良好的管理体系，形成了高素质高效率的发展趋势。我厂从2015年开始经营内衣主要生产:文胸、内裤、无痕文胸、调整型文胸、聚拢型文胸、时尚内衣等款式新颖中高档产品,有专业加工能力.做工精致，管理规模，质量为本。玉姿蝶针织内衣厂拥有完整、科学的质量管理体系，公司的诚信、实力和产品质量获得业界的认可。以多品种经营特色和薄利多销的原则，赢得了广大客户的信任。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-40805274787101d", "shop_url": "https://shop7414508088027.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"18200625782\",\"传真\":\"暂无\",\"地址\":\"广东省汕头市潮南区广东省汕头市潮南区陈店镇洋老村陈贵公路西侧\"}"}}, {"name": "汕头市腾辉针织实业有限公司", "phone": "15920023793", "main_categories": "", "tags": "入围无痕文胸服务榜 第3名|入围美背文胸热度榜 第7名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2200788056881b6cc0&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=740208712030,740201510016,740099937228,740098065448,740073985879,727608182527,652662683620,726802633619,727260500083,707730256726&aHdkaW5n_isUseGray=true", "name": "汕头市腾辉针织实业有限公司", "tags": "入围无痕文胸服务榜 第3名|入围美背文胸热度榜 第7名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2019.03.21\",\"年交易额\":\"1000万~2000万\",\"员工总数\":\"101~200人\"}", "cooperation": "{\"定制起订量\":\"1000件\",\"贴牌起订量\":\"1000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "汕头市腾辉针织实业有限公司是文胸、内裤、文胸等产品专业生产加工的公司，拥有完整、科学的质量管理体系。汕头市腾辉针织实业有限公司的诚信、实力和产品质量获得业界的认可。欢迎各界朋友莅临参观、指导和业务洽谈收起更多", "sgs_report": "", "shop_url": "https://tenghuiny.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0754 13692042877\",\"手机\":\"15920023793\",\"传真\":\"暂无\",\"地址\":\"广东汕头潮南区司马浦镇港西二路学校北1号\"}"}}, {"name": "汕头市菲絮针织品有限公司", "phone": "15815060369", "main_categories": "", "tags": "入围软支撑文胸热度榜 第12名|入围调整型文胸服务榜 第8名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=feixuzhenzhi&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=606553914753,634777306962,535689686523,599461803927,670457954667,733083414225,711334329813,625666321915,716241748410,725438686401&aHdkaW5n_isUseGray=true", "name": "汕头市菲絮针织品有限公司", "tags": "入围软支撑文胸热度榜 第12名|入围调整型文胸服务榜 第8名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2012.09.05\",\"年交易额\":\"2000万以上\",\"员工总数\":\"301~500人\"}", "cooperation": "{\"定制起订量\":\"1000件\",\"贴牌起订量\":\"1000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工 包工包料 清加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "本工厂专注生产内衣文胸十五年，以品质为生存之道，以价格为市场优势，诚信经营，互利互赢，承接各大渠道ODM,OEM订制，工厂设备齐全（不断上新工艺）长期生产现货，仓库现货库存充足，车间材料饱满，生产井然有序，对接很多大品牌跟二类电商渠道，能满足不同渠道商的需求生产，欢迎前来指临！收起更多", "sgs_report": "", "shop_url": "https://feixu1688.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0754 15815060369\",\"手机\":\"15815060369\",\"传真\":\"86 0754 15011700010\",\"地址\":\"广东汕头潮南区司马浦镇港洲老寨内一巷1号\"}"}}, {"name": "汕头市潮南区陈店思韵内衣厂", "phone": "18902716999", "main_categories": "主营:|无痕文胸|无钢圈文胸|调整型文胸", "tags": "2025上榜一钻工厂|入围无痕文胸服务榜 第9名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2042749713&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=861021969392,960015890328,959552023149,959084109061,858201043894,854917300796,855009424730,854605192757,854589224890,854177113826&aHdkaW5n_isUseGray=true", "name": "汕头市潮南区陈店思韵内衣厂", "tags": "2025上榜一钻工厂|入围无痕文胸服务榜 第9名", "main_categories": "主营:|无痕文胸|无钢圈文胸|调整型文胸", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2013.04.27\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"12000m²\",\"员工总数\":\"148人\"}", "cooperation": "{\"定制起订量\":\"2000件\",\"贴牌起订量\":\"2000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"包工包料 清加工 来图加工 来样加工\",\"增值税发票\":\"无\"}", "showroom": "本司主要生产文胸、内裤、塑身衣等贴胶无缝内衣产品，拥有完整、科学的质量管理体系。拥有欧美、线下实体、电商供应三条产品线。欢迎各界朋友莅临参观、指导和业务洽谈。", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2042749713", "shop_url": "https://siyunneiyi.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0754 89972609\",\"手机\":\"18902716999\",\"传真\":\"86 0754 86672702\",\"地址\":\"广东省汕头市潮南区陈店镇陈围东泰路十直7号\"}"}}, {"name": "汕头市潮阳区谷饶淞源泰针织内衣厂", "phone": "13421866665", "main_categories": "", "tags": "入围少女文胸热度榜 第8名|入围少女文胸服务榜 第4名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-22161647713166934e&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=774614669152,759779222044,737437565301,767513026300,741443097064,750921427320,743634353480,762195367905,742325905067,728638768675&aHdkaW5n_isUseGray=true", "name": "汕头市潮阳区谷饶淞源泰针织内衣厂", "tags": "入围少女文胸热度榜 第8名|入围少女文胸服务榜 第4名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2023.07.07\",\"年交易额\":\"2000万以上\",\"员工总数\":\"201~300人\"}", "cooperation": "{\"定制起订量\":\"5000件\",\"贴牌起订量\":\"5000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"10%\",\"增值税发票\":\"有\"}", "showroom": "汕头市潮阳区谷饶淞源泰针织内衣厂是内衣等产品专业生产加工的公司，拥有完整、科学的质量管理体系，产品涉及文胸、内裤、家居服、塑身衣、保暖内衣、泳衣等。如今，近30000平方米的现代化工业园，员工1000多人，20多条具有国际先进水平的专业内衣生产线和研发设计中心，美国格柏（GERBER）设计系统，近30项国家产品专利。拥有强大、完善的营销网络体系，在全国30多个省、市、自治区设有2000多家专卖销售网点，并承接国际OEM业务，产品出口远销欧美、东南亚、港澳台等多个国家和地区。公司连续多年被授予“质量信得过单位”、“质量优胜企业”、“文明企业”、“中国质量万里行质量先进单位”等殊荣。“中国内衣行业十大品牌”、“中国名优产品”。展望未来，淞源泰公司将与时俱进、开拓创新，坚持“一业多元”，逐步向“产业化、多元化、科技化、集团化。收起更多", "sgs_report": "", "shop_url": "https://shop19657762e9199.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"13421866665\",\"传真\":\"暂无\",\"地址\":\"广东汕头潮阳区谷饶镇上堡饶中路175号101\"}"}}, {"name": "嘉兴好桑缘丝绸服饰有限公司", "phone": "18768309910", "main_categories": "主营:|无钢圈文胸|女士三角裤|无痕文胸", "tags": "2025上榜一钻工厂|入围无痕文胸服务榜 第11名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=haosangyuan&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=738694871658,721566231980,1211011328,728197807020,740890120559,691528092152,805758655576,926719157031,1211016459,929533787678&aHdkaW5n_isUseGray=true", "name": "嘉兴好桑缘丝绸服饰有限公司", "tags": "2025上榜一钻工厂|入围无痕文胸服务榜 第11名", "main_categories": "主营:|无钢圈文胸|女士三角裤|无痕文胸", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2013.08.15\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"3447m²\",\"员工总数\":\"47人\"}", "cooperation": "{\"定制起订量\":\"200件\",\"贴牌起订量\":\"50件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工 包工包料 清加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "嘉兴好桑缘丝绸服饰有限公司是一家集设计、生产、销售、批发以及网络营销为一体的股份制公司，以ODM和OEM为结合的综合性企业。经过多年来的艰苦创业和公司所有员工的共同努力，以惊人的速度发展并建设成为富有雄厚实力的高素质企业。 拥有现代化的办公大楼和标准化的厂房，一流的先进生产设备，明亮通透的车间和仓库，以及完整、科学的质量管理体系。  专业生产真丝内衣、家居服、时装等多种桑蚕丝服饰，其设计以典雅的色彩、优美的线条、风姿卓越的成熟魅力吸引着各类丽人，演绎传述着健康、时尚、经典的服饰信息；其材质采用100%上等桑蚕丝面料，辅以一流的生产加工工艺，实现了面料、工艺、款式的完美结合，强调内在的服饰底藴、注重产品的健康舒适和时尚美观。 诚信、实力和产品质量获得业界的认可。欢迎各界朋友莅临参观、指导和业务洽谈。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=haosangyuan", "shop_url": "https://haosangyuan.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"086 0573 82336233\",\"手机\":\"18768309910\",\"传真\":\"暂无\",\"地址\":\"浙江省嘉兴市秀洲区塘汇街道曙光路473号\"}"}}, {"name": "汕头市潮南区陈店美之集内衣厂", "phone": "13322719832", "main_categories": "", "tags": "入围软支撑文胸服务榜 第4名|入围软支撑文胸热度榜 第7名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2021984901&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=707337399539,713612627050,724247421281,820135067700,792479440632,880292632176,775034415035,774799458091,831323012855,820871048339&aHdkaW5n_isUseGray=true", "name": "汕头市潮南区陈店美之集内衣厂", "tags": "入围软支撑文胸服务榜 第4名|入围软支撑文胸热度榜 第7名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2009.07.24\",\"年交易额\":\"501~1000万\",\"工厂面积\":\"1683m²\",\"员工总数\":\"39人\"}", "cooperation": "{\"定制起订量\":\"1000件\",\"贴牌起订量\":\"500件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工 轻加工 包工包料\",\"增值税发票\":\"无\"}", "showroom": "美之集内衣工厂座落于中国广东省内衣名镇——陈店镇，2009年创建，是一家集生产销售设计开发于一体的专业内衣工厂，工厂工艺精细，设计新颖独特，材料高档时尚，设备配套齐全，管理先进完善，产品远销各地，欢迎广大新老客户光临指导，来样来电咨询合作，共创美丽内衣伟业。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2021984901", "shop_url": "https://meizhiji168.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"13322719832\",\"传真\":\"暂无\",\"地址\":\"广东省汕头市潮南区陈店镇陈仙公路文光路段131号\"}"}}, {"name": "汕头市爱美芬服饰有限公司", "phone": "13536906926", "main_categories": "主营:|女士三角裤|无痕文胸|其它女士内裤", "tags": "2025上榜一钻工厂|入围无痕文胸实力榜 第17名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-418297755342617&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=745182844873,636413833517,742428853204,751440941874,636002680053,751520162071,714633738619,678342796198,868440125672,639522962438&aHdkaW5n_isUseGray=true", "name": "汕头市爱美芬服饰有限公司", "tags": "2025上榜一钻工厂|入围无痕文胸实力榜 第17名", "main_categories": "主营:|女士三角裤|无痕文胸|其它女士内裤", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2020.04.27\",\"年交易额\":\"1000万~2000万\",\"工厂面积\":\"2700m²\",\"员工总数\":\"72人\"}", "cooperation": "{\"定制起订量\":\"2000件\",\"贴牌起订量\":\"2000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来样加工 来图加工 包工包料\",\"开票点数\":\"10%\",\"增值税发票\":\"有\"}", "showroom": "爱美芬内衣厂成立于2008年，专注生产各式内衣，文胸保暖等产品，拥有多台圣东尼无缝内衣机，粘合机及专业车缝生产线，生产力及品质过硬的企业，欢迎国内外顾客选购及下单！", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-418297755342617", "shop_url": "https://aimeifenneiyi.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"13536906926\",\"传真\":\"暂无\",\"地址\":\"广东汕头潮阳区谷饶镇深洋村蟹地凯安里后面深洋三中楼房\"}"}}, {"name": "佛山市纤美儿内衣有限公司", "phone": "暂无", "main_categories": "", "tags": "入围无痕文胸服务榜 第12名|入围无钢圈文胸热度榜 第7名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-1850644529&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=705146669170,721239097672,720354961695,715349791103,800679280337,943548168395,783316829492,941464967949,779352580249,942970569733&aHdkaW5n_isUseGray=true", "name": "佛山市纤美儿内衣有限公司", "tags": "入围无痕文胸服务榜 第12名|入围无钢圈文胸热度榜 第7名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2015.06.30\",\"年交易额\":\"1000万~2000万\",\"员工总数\":\"11~50人\"}", "cooperation": "{\"定制起订量\":\"3000件\",\"贴牌起订量\":\"100件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工\",\"开票点数\":\"3%\",\"增值税发票\":\"有\"}", "showroom": "佛山市纤美儿内衣有限公司是一家专业批发，OEM（加工）， 市场营销为一体的调整型内衣企业。公司位于中国“ 内衣之都”名镇“盐步”。地理位置毗邻广州，交通便利。               \n   佛山市纤美儿内衣有限公司主要产品有：隐形无肩带文胸、高端美容院调整型内衣、哺乳内衣内裤和连体塑形衣、束裤等产品。                                                     \n   公司自主创立设计生产的“纤美儿”品牌内衣，秉承健康、时尚的设计理念，品种齐全，质量稳定，价格合理，在行业内享有知名度，且与多家淘宝商家及实体代理商、零售商建立了长期稳定的合作关系，产品远销国内外。                                                         \n              佛山市纤美儿内衣有限公司。      收起更多", "sgs_report": "", "shop_url": "https://fsqmeny.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0757 85709378\",\"手机\":\"暂无\",\"传真\":\"86 0757 85709378\",\"地址\":\"佛山南海区大沥镇盐步广佛公路平地路段南43号广东中大小商品城9号楼16号\"}"}}, {"name": "汕头市潮南区陈店锦秀针织厂", "phone": "暂无", "main_categories": "", "tags": "入围无钢圈文胸热度榜 第12名|入围无痕文胸服务榜 第14名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2215002394149fc7d5&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=732514202221,731527937653,698686289770,755507422878,730107089019,718568870981,692351932202,755565427778,733736239635,755481677174&aHdkaW5n_isUseGray=true", "name": "汕头市潮南区陈店锦秀针织厂", "tags": "入围无钢圈文胸热度榜 第12名|入围无痕文胸服务榜 第14名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2007.03.21\",\"年交易额\":\"2000万以上\",\"员工总数\":\"11~50人\"}", "cooperation": "{\"定制起订量\":\"2000件\",\"贴牌起订量\":\"10000个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来样加工\",\"增值税发票\":\"无\"}", "showroom": "广东省汕头衣彩贝内衣厂成立于2007年10多年来专注于女性内衣生产和研发，秉承“为女性创造健康和美丽”的企业使命，指导公司团队全心投入女性提供内衣健康，优雅和舒适的产品和体验潜心发掘细致成熟的女性风情收起更多", "sgs_report": "", "shop_url": "https://shop1ai1302072940.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0754 15768332418\",\"手机\":\"暂无\",\"传真\":\"86 1754 15768332418\",\"地址\":\"广东省汕头市潮南区广东省汕头市潮南区陈店镇美南村居委会附近尹莎俐\"}"}}, {"name": "汕头市永昌钦发针织实业有限公司", "phone": "13423756916", "main_categories": "主营:|无痕文胸|软支撑文胸|大码文胸", "tags": "2025上榜二钻工厂|入围大码文胸服务榜 第3名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=ycqfgs&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=688560428758,649795156607,692523578411,740470310780,692259953247,714094533380,687883717078,735998912654,687214764675,756466730741&aHdkaW5n_isUseGray=true", "name": "汕头市永昌钦发针织实业有限公司", "tags": "2025上榜二钻工厂|入围大码文胸服务榜 第3名", "main_categories": "主营:|无痕文胸|软支撑文胸|大码文胸", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2005.04.07\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"17544m²\",\"员工总数\":\"59人\"}", "cooperation": "{\"定制起订量\":\"1000件\",\"贴牌起订量\":\"1000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"10%\",\"增值税发票\":\"有\"}", "showroom": "汕头市永昌钦发针织实业有限公司,坐落于缔造中国文胸名都--中国潮南,公司自1995年成立至今,一直专注内衣生产与销售,不断拓展内衣市场,努力为厂家扩大产品销量,为客户提供满意商品。\n\n公司专门经销:胸围、内裤、束腹裤、背心、睡衣、睡袍等各种高、中、低档内衣系列。商品远销台湾、香港、东南亚、东欧、西欧、中东等国家和地区。　\n\n公司秉承“客户至上、平等互利、共同发展”的经营之道，已有数百家厂商与本公司签订长期合作的合同。我们有充分的实力和能力完成各种订单业务，可以让大单客户与我们所有厂家的产品进行面对面的接触。\n\n竭诚欢迎国内外内衣客商光临垂询洽谈业务、互惠互利、共谋发展!收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=ycqfgs", "shop_url": "https://ycqfgs.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0754 87766189\",\"手机\":\"13423756916\",\"传真\":\"86 0754 87763851\",\"地址\":\"广东汕头潮南区峡山龟山顶(潮南二建边)\"}"}}, {"name": "义乌市以南服饰有限公司", "phone": "18605893184", "main_categories": "主营:|女士三角裤|无痕文胸|女士本命年/红内裤", "tags": "2025上榜工厂|入围女士三角裤服务榜 第9名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-220790806777637146&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=725439853977,914124280112,710238613532,942383441645,915671670458,773913197474,954710498732,893189304594,770410977467,895125674216&aHdkaW5n_isUseGray=true", "name": "义乌市以南服饰有限公司", "tags": "2025上榜工厂|入围女士三角裤服务榜 第9名", "main_categories": "主营:|女士三角裤|无痕文胸|女士本命年/红内裤", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2017.05.25\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"1000m²\",\"员工总数\":\"28人\"}", "cooperation": "{\"定制起订量\":\"20000条\",\"贴牌起订量\":\"20000条\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 来样加工\",\"增值税发票\":\"无\"}", "showroom": "专业生产无缝高品质内裤，日产能5万+，年新品开发款式200款+以上,和淘宝电商/网红/直播有丰富的对接合作经验，最高可日发5万单。欢迎新老客户咨询", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-220790806777637146", "shop_url": "https://shop6386e17885me5.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0579 89891091\",\"手机\":\"18605893184\",\"传真\":\"暂无\",\"地址\":\"义乌市后宅街道华劲路35号义乌市稠城永兴食品厂内2号楼5楼\"}"}}, {"name": "佛山市雪尔曼服饰有限公司", "phone": "18575786904", "main_categories": "", "tags": "入围胸贴、乳贴服务榜 第13名|入围胸垫、插片热度榜 第2名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2496274473&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=747103034415&aHdkaW5n_isUseGray=true", "name": "佛山市雪尔曼服饰有限公司", "tags": "入围胸贴、乳贴服务榜 第13名|入围胸垫、插片热度榜 第2名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2015.01.04\",\"年交易额\":\"101~500万\",\"工厂面积\":\"3000m²\",\"员工总数\":\"2人\"}", "cooperation": "{\"定制起订量\":\"1000副\",\"贴牌起订量\":\"5000副\",\"接外贸订单\":\"支持\",\"加工方式\":\"清加工 来样加工 来图加工 包工包料\",\"开票点数\":\"6%\",\"增值税发票\":\"有\"}", "showroom": "佛山雪尔曼服饰有限公司是以海绵胸垫、瑜伽服垫子、泳衣插片、文胸模杯、文胸内衣垫等产品专业生产加工的公司，拥有完整、科学的质量管理体系。公司占地面积4000方，生产工人约50人，定型机40多台，日产量约40000对，公司根据国际内衣流行趋势，设计研发出各种符合世界时尚潮流，人体工程学的胸杯。产品大量运用做瑜伽服，泳衣，文胸，运动内衣，晚礼服，舞蹈服等服饰上。经过多年不懈的奋斗和努力，公司如今发展成为集设计，研发，生产，加工为一体的创新型公司，以满足不同客户的需求。设计生产的新产品，新款式深受广大客户的青睐和喜爱。公司产品以其稳定的质量、合理的价格、周到的服务，赢得了客户的广泛认可。\n公司秉承“认真、理解、沟通、诚信”的企业理念，不断提升企业管理水平，推行人性化管理革新，营造健康和谐的企业文化。佛山雪尔曼服饰公司将不断改革创新，推动行业发展，以诚信、实力和产品质量获得业界的认可欢迎新老客户莅临收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2496274473", "shop_url": "https://xueerman.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0757 85959993\",\"手机\":\"18575786904\",\"传真\":\"暂无\",\"地址\":\"广东省佛山市南海区大沥镇黄岐沙溪村三乡路三街5号首层之一\"}"}}, {"name": "普宁市奥升服饰有限公司", "phone": "15975243848", "main_categories": "主营:|无痕文胸|无钢圈文胸|保暖马甲背心", "tags": "2025上榜三钻工厂|入围保暖马甲背心热度榜 第1名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2206530923665f9a9f&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=715795409307,745412374040,680069953252,746763831829,718819924574,757352289635,722075328491,694855584793,701136967955,678492719154&aHdkaW5n_isUseGray=true", "name": "普宁市奥升服饰有限公司", "tags": "2025上榜三钻工厂|入围保暖马甲背心热度榜 第1名", "main_categories": "主营:|无痕文胸|无钢圈文胸|保暖马甲背心", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2019.04.25\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"5781m²\",\"员工总数\":\"258人\"}", "cooperation": "{\"定制起订量\":\"2000件\",\"贴牌起订量\":\"2000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"9%\",\"增值税发票\":\"有\"}", "showroom": "普宁市奥升服饰有限公司，位于中国最大的内衣生产区域潮汕地区，是一家集研发、智造、营销服务为一体的现代化创新型内衣企业，主营无痕贴合、果冻类内衣，保暖背心等，产品获得国家技术创新专利版权认证，年产量2000万件以上。\n公司注重产品质量、研发与创新，与猫人、都市丽人、欧迪芬等多品牌合作，为合作伙伴量身打造爆款。引进行业领先生产系统，德国全自动化裁床，新型点胶机、定型机、果冻机、超声波热压机等一系列先进生产设备，产品从研发到上市只需15天，做到3天出版，7-10天发货，成为快时尚内衣供应商代表，并自建云仓，为客户提供一件代发等一站式服务，解决发货时效、库存等问题，秉承“质优价廉、合作共赢”的经营理念，坚持“客户第一”的原则为广大客户提供优质的服务。\n欢迎洽谈合作！！收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2206530923665f9a9f", "shop_url": "https://shop12877y772c646.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"15975243848\",\"传真\":\"暂无\",\"地址\":\"广东省揭阳市普宁市占陇镇杉铺村农场工业区益德楼\"}"}}, {"name": "广东斯柏丽供应链有限公司", "phone": "15602913939", "main_categories": "主营:|无钢圈文胸|无痕文胸|美背文胸", "tags": "2025上榜一钻工厂|入围无痕文胸实力榜 第6名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2562584468g3szo&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=639414410727,713205633613,613215715046,624936206775,601885551862,633886948883,714304754145,584711756437,718158366417,651889485893&aHdkaW5n_isUseGray=true", "name": "广东斯柏丽供应链有限公司", "tags": "2025上榜一钻工厂|入围无痕文胸实力榜 第6名", "main_categories": "主营:|无钢圈文胸|无痕文胸|美背文胸", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2015.05.05\",\"年交易额\":\"1000万~2000万\",\"工厂面积\":\"5000m²\",\"员工总数\":\"260人\"}", "cooperation": "{\"定制起订量\":\"1000件\",\"贴牌起订量\":\"1000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "广东斯柏丽供应链股份有限公司是文胸、内裤、文胸等产品专业生产加工的公司，拥有完整、科学的质量管理体系。广东斯柏丽供应链股份有限公司的诚信、实力和产品质量获得业界的认可。欢迎各界朋友莅临参观、指导和业务洽谈收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2562584468g3szo", "shop_url": "https://suplly.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0754 89377129\",\"手机\":\"15602913939\",\"传真\":\"暂无\",\"地址\":\"广东深圳宝安区西乡街道流塘阳光花园G座1001\"}"}}, {"name": "汕头市潮南区陈店黛仙琪内衣厂", "phone": "13729211100", "main_categories": "主营:|大码文胸|无钢圈文胸|无痕文胸", "tags": "2025上榜三钻工厂|入围大码文胸实力榜 第2名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2678910563488e4&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=697253753754,735025404444,669006122208,649189926762,763403658323,917830555932,848482238290,897046412110,890089624675,868060858095&aHdkaW5n_isUseGray=true", "name": "汕头市潮南区陈店黛仙琪内衣厂", "tags": "2025上榜三钻工厂|入围大码文胸实力榜 第2名", "main_categories": "主营:|大码文胸|无钢圈文胸|无痕文胸", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2009.09.10\",\"年交易额\":\"50万以下\",\"工厂面积\":\"1440m²\",\"员工总数\":\"31人\"}", "cooperation": "{\"定制起订量\":\"0\",\"贴牌起订量\":\"0\",\"接外贸订单\":\"不支持\",\"增值税发票\":\"无\"}", "showroom": "黛仙琪内衣厂成立已17年，拥有17年的专业大杯大码调整型内衣，拥有专业生产机器近200台，专业的技术人员以更好的品质与速度出货供应产品，本厂的实力与品质得到消费者的认可！欢迎各界朋友参观、指导及业务洽谈收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2678910563488e4", "shop_url": "https://daixianqineiyi.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0754 89978121\",\"手机\":\"13729211100\",\"传真\":\"暂无\",\"地址\":\"广东省汕头市潮南区陈店镇汕柄村新汕南路王厝桥头东侧\"}"}}, {"name": "佛山市南海区傲盈方服饰厂", "phone": "15015621708", "main_categories": "", "tags": "入围调整型文胸热度榜 第9名|入围无钢圈文胸服务榜 第17名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2217220425642d6a72&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=815570199595,785665259413,785698326510,773986749520,786934982127,874982099063,860958580877,854038548215,811151796354,773973455768&aHdkaW5n_isUseGray=true", "name": "佛山市南海区傲盈方服饰厂", "tags": "入围调整型文胸热度榜 第9名|入围无钢圈文胸服务榜 第17名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2024.01.12\",\"年交易额\":\"101~500万\",\"员工总数\":\"101~200人\"}", "cooperation": "{\"定制起订量\":\"3000件\",\"贴牌起订量\":\"300件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "佛山市南海区傲盈方服饰厂是一家注重女性健康，从事高品质功能性内衣研发、生产和销售于一体的综合型服饰制造工厂。位于佛山南海区盐步华夏工业区，工厂面积1000方，日均产量在500件以上，我们拥有自己的设计团队和产线，承接国内和国外一件代发，小批量高端定制单，跨境外贸的大额订单以及定制贴牌服务，公司拥有完整、科学的质量管理体系。欢迎各界朋友莅临参观、指导和业务洽谈。收起更多", "sgs_report": "", "shop_url": "https://shop29m44u5k84546.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"15015621708\",\"传真\":\"暂无\",\"地址\":\"广东省佛山市南海区大沥镇盐步华夏工业区一号楼五层A002室\"}"}}, {"name": "汕头市潮阳区谷饶花季韵味内衣厂", "phone": "13926771001", "main_categories": "", "tags": "入围女士三角裤新晋榜 第13名|入围无痕文胸热度榜 第2名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-22195965236063862d&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=919440023901,919452311339,920004902519,950305807501,907101249807,953837259764,931744453921,917687830500,907932912744,905287386227&aHdkaW5n_isUseGray=true", "name": "汕头市潮阳区谷饶花季韵味内衣厂", "tags": "入围女士三角裤新晋榜 第13名|入围无痕文胸热度榜 第2名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2025.03.26\",\"年交易额\":\"1000万~2000万\",\"企业面积\":\"300m²\",\"员工总数\":\"3人\"}", "cooperation": "{\"定制起订量\":\"1000件\",\"贴牌起订量\":\"1000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "汕头市潮阳区谷饶花季韵味针织内衣厂是内衣等产品专业生产加工的公司，拥有完整、科学的质量管理体系，产品涉及文胸、内裤、家居服、塑身衣、保暖内衣、泳衣等。如今，近30000平方米的现代化工业园，员工1000多人，20多条具有国际先进水平的专业内衣生产线和研发设计中心，美国格柏（GERBER）设计系统，近30项国家产品专利。拥有强大、完善的营销网络体系，在全国30多个省、市、自治区设有2000多家专卖销售网点，并承接国际OEM业务，产品出口远销欧美、东南亚、港澳台等多个国家和地区。公司连续多年被授予“质量信得过单位”、“质量优胜企业”、“文明企业”、“中国质量万里行质量先进单位”等殊荣。“中国内衣行业十大品牌”、“中国名优产品”。展望未来，淞源泰公司将与时俱进、开拓创新，坚持“一业多元”，逐步向“产业化、多元化、科技化、集团化。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-22195965236063862d", "shop_url": "https://shop5503001083s08.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"13926771001\",\"传真\":\"暂无\",\"地址\":\"广东省汕头市潮阳区谷饶镇上堡中学斜对面\"}"}}];
+
+const app = Vue.createApp({
+  data(){ return {
+    q: '',
+    raw: data,
+    page: 1,
+    perPage: 20,
+    hasImage: false,
+    detail: null
+  }},
+  computed: {
+    filtered(){
+      let q = this.q.trim().toLowerCase();
+      let arr = this.raw.slice();
+      if(this.hasImage) arr = arr.filter(x=>x.images && x.images.length);
+      if(q){
+        arr = arr.filter(f=>{
+          return (f.name||'').toLowerCase().includes(q)
+            || (f.main_categories||'').toLowerCase().includes(q)
+            || (f.tags||'').toLowerCase().includes(q)
+            || (f.phone||'').toLowerCase().includes(q);
+        });
+      }
+      return arr;
+    },
+    pages(){ return Math.max(1, Math.ceil(this.filtered.length / this.perPage)); },
+    paged(){ return this.filtered.slice((this.page-1)*this.perPage, this.page*this.perPage); }
+  },
+  methods:{
+    openDetail(f){ this.detail = f; window.scrollTo(0,0); },
+    prevPage(){ if(this.page>1) this.page--; },
+    nextPage(){ if(this.page<this.pages) this.page++; },
+    formatValue(v){
+      if(v===null || v===undefined || v==='') return '<span class="text-gray-400">—</span>';
+      let s = String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      s = s.replace(/(https?:\/\/[^\s,;]+)/g, '<a href="$1" target="_blank" class="text-blue-600 underline">$1</a>');
+      s = s.replace(/\n/g,'<br/>');
+      return s;
+    }
+  },
+  watch:{
+    perPage(){ this.page = 1; },
+    q(){ this.page = 1; }
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
