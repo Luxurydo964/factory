@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>工厂列表</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="app" class="min-h-screen p-4 md:p-8">
+    <header class="max-w-6xl mx-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl md:text-3xl font-bold">工厂列表</h1>
+        <div>
+          <input v-model="q" placeholder="搜索名称 / 类别 / 标签" class="border rounded px-3 py-1 w-60" />
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto grid gap-6 md:grid-cols-3 sm:grid-cols-2 grid-cols-1">
+      <section class="col-span-1 md:col-span-2">
+        <div class="bg-white shadow rounded p-4">
+          <div v-if="filtered.length===0" class="py-8 text-center text-gray-500">没有匹配的工厂</div>
+          <ul>
+            <li v-for="(f, idx) in paged" :key="idx" class="border-b last:border-b-0">
+              <div class="flex items-center p-3 hover:bg-gray-50">
+                <div class="w-20 h-12 flex-shrink-0 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
+                  <img v-if="f.images && f.images.length" :src="f.images[0]" alt="logo" class="w-full object-cover" />
+                  <svg v-else xmlns='http://www.w3.org/2000/svg' class='w-6 h-6 text-gray-400' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 7a4 4 0 014-4h10a4 4 0 014 4v10a4 4 0 01-4 4H7a4 4 0 01-4-4V7z' /></svg>
+                </div>
+                <div class="ml-3 flex-1">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="font-semibold text-lg">{{ f.name || "(无名称)" }}</div>
+                      <div class="text-sm text-gray-600">{{ f.main_categories }}</div>
+                    </div>
+                    <div class="text-right text-sm text-gray-600">
+                      <div>联系方式</div>
+                      <div class="font-medium">{{ f.phone }}</div>
+                    </div>
+                  </div>
+                  <div class="mt-2 text-sm text-gray-500">
+                    标签: <span v-if="f.tags">{{ f.tags }}</span><span v-else>—</span>
+                  </div>
+                  <div class="mt-2">
+                    <button @click="openDetail(f)" class="px-3 py-1 rounded bg-blue-600 text-white text-sm">详情</button>
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+
+          <div class="flex items-center justify-between mt-4">
+            <div class="text-sm text-gray-600">共 {{ filtered.length }} 条</div>
+            <div class="space-x-2">
+              <button @click="prevPage" :disabled="page===1" class="px-2 py-1 border rounded disabled:opacity-50">上一页</button>
+              <button @click="nextPage" :disabled="page>=pages" class="px-2 py-1 border rounded disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <aside class="col-span-1">
+        <div class="bg-white shadow rounded p-4">
+          <h2 class="font-semibold mb-2">筛选</h2>
+          <div class="mb-2">
+            <label class="text-sm text-gray-600">页面大小</label>
+            <select v-model.number="perPage" class="w-full border rounded px-2 py-1">
+              <option v-for="n in [10,20,50,100]" :value="n">{{ n }}</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="text-sm text-gray-600">只显示有图片</label>
+            <input type="checkbox" v-model="hasImage" class="ml-2" />
+          </div>
+          <div class="text-sm text-gray-600 mt-4">点击列表中“详情”查看全部信息并跳转。</div>
+        </div>
+      </aside>
+    </main>
+
+    <div v-if="detail" class="fixed inset-0 bg-black/40 flex items-start md:items-center justify-center p-4 z-50">
+      <div class="bg-white rounded shadow max-w-4xl w-full max-h-[90vh] overflow-auto">
+        <div class="flex items-center justify-between p-4 border-b">
+          <div class="text-lg font-semibold">{{ detail.name || "(无名称)" }}</div>
+          <div><button @click="detail=null" class="px-3 py-1 border rounded">关闭</button></div>
+        </div>
+        <div class="p-4 grid gap-4 md:grid-cols-3">
+          <div class="md:col-span-2">
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">联系方式</div>
+              <div class="font-medium text-lg">{{ detail.phone }}</div>
+              <div class="text-sm text-gray-500 mt-2" v-if="detail.raw.contact_info">{{ detail.raw.contact_info }}</div>
+            </div>
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">主营目录</div>
+              <div class="font-medium">{{ detail.main_categories }}</div>
+            </div>
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">标签</div>
+              <div>{{ detail.tags }}</div>
+            </div>
+
+            <div class="mb-4" v-if="Object.keys(detail.raw).length">
+              <h3 class="font-semibold mb-2">完整信息</h3>
+              <table class="min-w-full text-sm">
+                <tbody>
+                  <tr v-for="(v,k) in detail.raw" :key="k" class="border-t">
+                    <td class="py-2 align-top font-medium w-40 text-gray-700">{{ k }}</td>
+                    <td class="py-2" v-html="formatValue(v)"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="md:col-span-1">
+            <div class="space-y-3">
+              <div v-if="detail.images && detail.images.length">
+                <div class="text-sm text-gray-600 mb-2">图片</div>
+                <div class="grid grid-cols-1 gap-2">
+                  <img v-for="(u,i) in detail.images" :key="i" :src="u" class="w-full h-40 object-contain bg-gray-100 p-1" />
+                </div>
+              </div>
+              <div v-else class="text-sm text-gray-500">没有图片</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+/* 数据占位符 — 生成时由 Python 替换为 JSON 列表 */
+const data = [{"name": "平度市梦朵假睫毛有限公司", "phone": "暂无", "main_categories": "主营:|假睫毛|双眼皮贴|其他美妆工具", "tags": "2025上榜四钻工厂|入围双眼皮贴服务榜 第6名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2208869508601f9365&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=779331664671,779291819499,779345272291,779323100972,779287131773,779271147936,748557150385,745117442354,756668363554,751061866790&aHdkaW5n_isUseGray=true", "name": "平度市梦朵假睫毛有限公司", "tags": "2025上榜四钻工厂|入围双眼皮贴服务榜 第6名", "main_categories": "主营:|假睫毛|双眼皮贴|其他美妆工具", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2019.06.26\",\"年交易额\":\"101~500万\",\"工厂面积\":\"1227m²\",\"员工总数\":\"30人\"}", "cooperation": "{\"定制起订量\":\"1000个\",\"贴牌起订量\":\"1000个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工 清加工 包工包料\",\"开票点数\":\"6%\",\"增值税发票\":\"有\"}", "showroom": "质量服务第一.价格最低服务最好", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2208869508601f9365", "shop_url": "https://shop4282595639058.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0532 15153297795\",\"手机\":\"暂无\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市山东青岛平度市同和街道办事处李戈庄村398号\"}"}}, {"name": "平度市泰赫美睫毛厂", "phone": "13245325777", "main_categories": "", "tags": "入围假睫毛服务榜 第15名|入围假睫毛镊子新晋榜 第3名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-22176579504741c6dd&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=788475024533,793464710239,788358555561,788473940559,816526169929,802834096031,794215281504,795816404932,960235289177,826783278035&aHdkaW5n_isUseGray=true", "name": "平度市泰赫美睫毛厂", "tags": "入围假睫毛服务榜 第15名|入围假睫毛镊子新晋榜 第3名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2023.09.20\",\"年交易额\":\"501~1000万\",\"企业面积\":\"450m²\",\"员工总数\":\"10人\"}", "cooperation": "{\"定制起订量\":\"10盒\",\"贴牌起订量\":\"10件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "平度市泰赫美睫毛是占地2400平，车间面积在2000平，员工人数65人，质检组人员15名，专注于研发新品和严格把控产品质量为主。自有品牌，贴牌代工，跨境电商和线下批发。欢迎致电选购", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-22176579504741c6dd", "shop_url": "https://shop38110779546b6.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"13245325777\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市同和街道办事处张家荆戈庄46-1号\"}"}}, {"name": "平度市小红花假睫毛厂", "phone": "暂无", "main_categories": "", "tags": "入围美睫胶热度榜 第15名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-221185078404959fe8&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=887234498602,888003576079,683782599404,659015112476,681731555122,655054800855,648573775969,718174428118,659272749225,887206366965&aHdkaW5n_isUseGray=true", "name": "平度市小红花假睫毛厂", "tags": "入围美睫胶热度榜 第15名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2021.05.31\",\"年交易额\":\"50~100万\",\"企业面积\":\"20m²\",\"员工总数\":\"1人\"}", "cooperation": "{\"定制起订量\":\"500件\",\"贴牌起订量\":\"500件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"包工包料 来样加工 来图加工\",\"开票点数\":\"3%\",\"增值税发票\":\"有\"}", "showroom": "本工厂专业生产假睫毛十余年，有丰富的假睫毛生产、’研发经验。各类假睫毛应有尽有！嫁接睫毛，单根，一秒开花，婴儿直毛，彩色睫毛，yy睫毛，仙女单根朵毛，三叶草睫毛，3D,5D,6D化纤睫毛，3D水貂毛，磁铁睫毛，鱼尾假睫毛，自粘睫毛等，欢迎新老客户下单。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-221185078404959fe8", "shop_url": "https://xiaohonghua.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"暂无\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市山东青岛平度市大泽山镇东高家村140号\"}"}}, {"name": "青岛靓睫优美假睫毛工艺品有限公司", "phone": "暂无", "main_categories": "", "tags": "入围假睫毛新晋榜 第5名|入围假睫毛热度榜 第4名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-22182498279474a83f&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=897931550327,912490556815,913819295599,897903958900,907870737054,891180841050,907386458424,907377338674,898357033621,912524632698&aHdkaW5n_isUseGray=true", "name": "青岛靓睫优美假睫毛工艺品有限公司", "tags": "入围假睫毛新晋榜 第5名|入围假睫毛热度榜 第4名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2023.01.29\",\"年交易额\":\"2000万以上\",\"员工总数\":\"101~200人\"}", "cooperation": "{\"定制起订量\":\"50盒\",\"贴牌起订量\":\"1000盒\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工\",\"增值税发票\":\"无\"}", "showroom": "青岛靓睫优美假睫毛工艺品有限公司是FADVAN品牌源头，假睫毛现货、睫毛嫁接辅助工具、嫁接睫毛（yy、下睫毛、三叶草、四叶草、五叶草、圆毛、扁毛、山茶花、狐系、天鹅绒等）、自粘睫毛、假睫毛定制等产品专业生产加工的公司，拥有完整、科学的质量管理体系。青岛靓睫优美假睫毛工艺品有限公司的诚信、实力和产品质量获得业界的认可。欢迎各界朋友莅临参观、指导和业务洽谈。收起更多", "sgs_report": "", "shop_url": "https://shop10535297vv0o9.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"暂无\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市凤台街道办事处杭州南路188-69号\"}"}}, {"name": "青岛画睫美妆有限公司", "phone": "15908940198", "main_categories": "主营:|假睫毛|假睫毛镊子|美睫胶", "tags": "2025上榜二钻工厂|入围美睫胶热度榜 第8名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2218553531420b2b40&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=905235346771,903303543041,908312288244,907408914464,905165306862,904212734948,915159221498,903937759231,907897749215,904677294572&aHdkaW5n_isUseGray=true", "name": "青岛画睫美妆有限公司", "tags": "2025上榜二钻工厂|入围美睫胶热度榜 第8名", "main_categories": "主营:|假睫毛|假睫毛镊子|美睫胶", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2023.01.16\",\"年交易额\":\"1000万~2000万\",\"工厂面积\":\"1965m²\",\"员工总数\":\"130人\"}", "cooperation": "{\"定制起订量\":\"100个\",\"贴牌起订量\":\"100个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"3%\",\"增值税发票\":\"有\"}", "showroom": "青岛画睫美妆有限公司，从事假睫毛研发、技术、生产及销售10年。公司占地2000平米，拥有员工200多名，产品涵盖对毛、朵毛、磁吸、免胶等大类共计200多种款式，年产量3000多万对，产品出口欧美、日韩、中东、东南亚等国家和地区。欢迎国内外客户实地参观考察，业务洽谈！收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2218553531420b2b40", "shop_url": "https://shop809633x9y5y05.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"15908940198\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市人民路74号一幢1-3楼\"}"}}, {"name": "青岛蝶妃日用品有限公司", "phone": "17860776699", "main_categories": "主营:|假睫毛|双眼皮贴|睫毛夹", "tags": "2025上榜二钻工厂|入围双眼皮贴热度榜 第5名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2531976255&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=915782075405,740430731390,859925436097,762396439989,751778878271,739529059040,736209073801,866329912813,818131497686,916643792841&aHdkaW5n_isUseGray=true", "name": "青岛蝶妃日用品有限公司", "tags": "2025上榜二钻工厂|入围双眼皮贴热度榜 第5名", "main_categories": "主营:|假睫毛|双眼皮贴|睫毛夹", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2015.05.04\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"5904m²\",\"员工总数\":\"151人\"}", "cooperation": "{\"定制起订量\":\"1000套\",\"贴牌起订量\":\"1000套\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工 包工包料\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "专业20余年生产代工欧美日知名品牌、商超、电商，国内电商知名品牌，月产量280-500万对各种化纤、水貂毛、夸张、羽毛成品对毛，热熔朵毛月产80-200万盒A\\鱼尾、花仙朵、下睫毛、10P-20p，工厂通过WCA\\BSCI\\TRAGET\\迪士尼\\GMP等国际认证，产品有FDA、sgs、bv、msds等检测报告。\n品质、诚信、高效--我们不变的追求。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2531976255", "shop_url": "https://qddiefei.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0532 83326789\",\"手机\":\"17860776699\",\"传真\":\"86 0532 83326789\",\"地址\":\"山东省青岛市平度市外向经济开发区宏伟路18号\"}"}}, {"name": "平度市小薇睫毛加工厂", "phone": "15266234111", "main_categories": "主营:|假睫毛|睫毛夹", "tags": "2025上榜二钻工厂|入围假睫毛热度榜 第9名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2208370488203bebbe&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=705322838629,646667477273,679793923753,731348876268,906039125074,907807269284,840041567152,638673990879,849982750956,850050805056&aHdkaW5n_isUseGray=true", "name": "平度市小薇睫毛加工厂", "tags": "2025上榜二钻工厂|入围假睫毛热度榜 第9名", "main_categories": "主营:|假睫毛|睫毛夹", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2020.06.04\",\"年交易额\":\"101~500万\",\"工厂面积\":\"2666m²\",\"员工总数\":\"47人\"}", "cooperation": "{\"定制起订量\":\"100件\",\"贴牌起订量\":\"3000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来样加工 包工包料 来图加工 清加工\",\"开票点数\":\"1%\",\"增值税发票\":\"有\"}", "showroom": "平度市小薇睫毛加工厂是专注于磁吸假睫毛及配套工具等产品生产的工厂，占地2667平方米，获得CE认证、SGS认证、CPSC认证、拥有15项专利，商标、版权、中国商品条形码系统成员等证书，产品质地优良上乘。 本厂坚持不断地研发睫毛款式，开发配套模具，优质的服务使工厂不断壮大，走在同行业的前列，欢迎海内外客户前来合作洽谈。愿与您建立长期友好的业务合作关系，携手共图发展。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2208370488203bebbe", "shop_url": "https://xiaoweijiemao.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"15266234111\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市田庄镇张东村东\"}"}}, {"name": "平度市万星河假睫毛厂", "phone": "17362253331", "main_categories": "主营:|假睫毛", "tags": "2025上榜二钻工厂|入围假睫毛服务榜 第19名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2219458641961aa88f&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=940418795050,946403720233,961041451058,959922178689,918576377531,951938405045,912648740838,937915417884,911794621742,912041305082&aHdkaW5n_isUseGray=true", "name": "平度市万星河假睫毛厂", "tags": "2025上榜二钻工厂|入围假睫毛服务榜 第19名", "main_categories": "主营:|假睫毛", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2023.03.30\",\"年交易额\":\"501~1000万\",\"工厂面积\":\"1500m²\",\"员工总数\":\"57人\"}", "cooperation": "{\"定制起订量\":\"1000盒\",\"贴牌起订量\":\"1000盒\",\"接外贸订单\":\"支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "万星河是一个聚焦于假睫毛的生产商，致力于打造“妈生感”的假睫毛，专注真实感、更持久、更柔软、更方便的假睫毛产品研究，从原材料到生成技术不停革新，帮助不同消费者在不同场景完成理想的妆容。“满目星河皆是你”既是我们的品牌寓意，也是我们的品牌目标，以匠心精神孜孜追求简而不凡的美。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2219458641961aa88f", "shop_url": "https://shop3325hj263x620.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"17362253331\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市长春路与常州路交叉口东北200米万星河假睫毛工厂\"}"}}, {"name": "平度市芒果果假睫毛店", "phone": "暂无", "main_categories": "", "tags": "入围假睫毛热度榜 第10名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-221546756460052a21&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=711166259513,725836054027,710750225825,712150936673,733242792368,712406825564,726272699257,725523183566,706170693932,706170845852&aHdkaW5n_isUseGray=true", "name": "平度市芒果果假睫毛店", "tags": "入围假睫毛热度榜 第10名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2022.09.22\",\"年交易额\":\"2000万以上\",\"员工总数\":\"51~100人\"}", "cooperation": "{\"定制起订量\":\"10000个\",\"贴牌起订量\":\"10个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"增值税发票\":\"无\"}", "showroom": "支持定制代发，各路货色全部有", "sgs_report": "", "shop_url": "https://shop1x80a4l997600.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"暂无\",\"传真\":\"暂无\",\"地址\":\"山东青岛平度市同和街道办事处三城路888号72号楼3号103户\"}"}}, {"name": "青岛亮优特创新科技有限公司", "phone": "15898822555", "main_categories": "主营:|假睫毛", "tags": "2025上榜二钻工厂|入围假睫毛热度榜 第5名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2224136242&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=935604788241,943078936312,935068283709,941024081508,943094540291,942532097761,941523171070,941506475153,934101991580,951721905197&aHdkaW5n_isUseGray=true", "name": "青岛亮优特创新科技有限公司", "tags": "2025上榜二钻工厂|入围假睫毛热度榜 第5名", "main_categories": "主营:|假睫毛", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2014.01.24\",\"年交易额\":\"1000万~2000万\",\"工厂面积\":\"2669m²\",\"员工总数\":\"20人\"}", "cooperation": "{\"定制起订量\":\"100件\",\"贴牌起订量\":\"100件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"轻加工 包工包料 来样加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "青岛亮优特创新科技有限公司目前已安装20台睫毛生产设备，日产睫毛2万盒，大大缩短订单供应时间，提高客户发货速度！\n工厂拥有专业化的生产研发团队，集设计、生产、销售等全方位服务于一体的企业。公司为wish,亚马逊、国际站等跨境电商平台和外贸公司供货，为业内各品牌客户提供OEM加工服务，质量保障，货品齐全，货源充足，货期稳定收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2224136242", "shop_url": "https://liangyoute.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0532 82365777\",\"手机\":\"15898822555\",\"传真\":\"86 0532 82365777\",\"地址\":\"山东省青岛市平度市山东青岛平度市经济开发区新区大道67号\"}"}}, {"name": "平度市艺菲假睫毛厂", "phone": "15953227658", "main_categories": "主营:|假睫毛|美睫胶|假睫毛镊子", "tags": "2025上榜二钻工厂|入围美睫胶热度榜 第9名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-3193896734d792b&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=912571717344,911754391288,660175620087,653201669352,755040621558,732298386330,677183126365,713834424206,726433580540,718714099381&aHdkaW5n_isUseGray=true", "name": "平度市艺菲假睫毛厂", "tags": "2025上榜二钻工厂|入围美睫胶热度榜 第9名", "main_categories": "主营:|假睫毛|美睫胶|假睫毛镊子", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2017.02.16\",\"年交易额\":\"101~500万\",\"工厂面积\":\"6500m²\",\"员工总数\":\"31人\"}", "cooperation": "{\"定制起订量\":\"100件\",\"贴牌起订量\":\"100件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"增值税发票\":\"无\"}", "showroom": "青岛市平度市艺菲假睫毛厂具有十几年的专业代工生产经验，为欧美日韩的多家知名品牌、商超、电商等多家知名睫毛品牌提供代工生产及技术支持。\n我们现在是一家拥有自主研发与生产代工的睫毛工厂，拥有假睫毛研发的技术与设备，可以给客户进行独家的研发设计睫毛款式，并严格保密客户款式。\n我们拥有6000平的工厂，无尘生产车间，月产量200-500万对各类化纤、水貂毛3D5D等成品对毛。分段朵毛热熔朵毛月产100-200万盒。同时还有各类免胶自粘睫毛、磁铁睫毛、种植睫毛等产品，产品拥有FDA、MSDS、等国外所需的质检报告。\n我们拥有完整、科学的生产线并且严格按照ISO9001质量管理体系运行，外贸品质，严格质检，满意的售后，让客户省心，放心收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-3193896734d792b", "shop_url": "https://pdyfjm.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0532 15953227658\",\"手机\":\"15953227658\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市大泽镇镇，长乐驻地\"}"}}, {"name": "广州采菁化妆品有限公司", "phone": "18211209260", "main_categories": "主营:|口红|腮红、胭脂|假睫毛", "tags": "2025上榜二钻工厂|入围腮红、胭脂热度榜 第8名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-3309838456b3763&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=683849061052,706649937247,693226227530,708583628427,674315751277,692849378831,681273484760,750167790987,707150207141,687799389479&aHdkaW5n_isUseGray=true", "name": "广州采菁化妆品有限公司", "tags": "2025上榜二钻工厂|入围腮红、胭脂热度榜 第8名", "main_categories": "主营:|口红|腮红、胭脂|假睫毛", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2017.05.10\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"7847m²\",\"员工总数\":\"49人\"}", "cooperation": "{\"定制起订量\":\"6000套\",\"贴牌起订量\":\"6000瓶\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来图加工 来样加工\",\"增值税发票\":\"无\"}", "showroom": "我司深耕化妆品行业多年， 加工生产化妆品各类型产品达1000+ ，涵盖美妆类目大部分产品。主打大市场爆款产品加工生产，日出货量达20万+，配备独立研发团队，具备独立自主开发产品能力，可提供来样测绘加工。\n收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-3309838456b3763", "shop_url": "https://gzcaijing.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"18211209260\",\"传真\":\"暂无\",\"地址\":\"广东省汕头市潮阳区和平镇凤善\"}"}}, {"name": "平度市李不晚睫毛厂", "phone": "13356880325", "main_categories": "", "tags": "入围化妆工具套装热度榜 第14名|入围化妆工具套装服务榜 第10名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-221701142400933e84&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=760715045215,758026448992,763647924685,756955339634,763127557290,924072278727,914693121549,911697967918,909650744198,887800057878&aHdkaW5n_isUseGray=true", "name": "平度市李不晚睫毛厂", "tags": "入围化妆工具套装热度榜 第14名|入围化妆工具套装服务榜 第10名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2023.12.07\",\"年交易额\":\"101~500万\",\"企业面积\":\"54m²\",\"员工总数\":\"6人\"}", "cooperation": "{\"定制起订量\":\"100件\",\"贴牌起订量\":\"100件\",\"接外贸订单\":\"支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"增值税发票\":\"无\"}", "showroom": "平度市李不晚睫毛厂位于山东青岛，从事睫毛的设计生产以及加工，主要生产分段睫毛、嫁接睫毛、对毛等类型睫毛，还制作睫毛吸塑包装，睫毛胶水等，批发零售假睫毛、睫毛胶水、镊子等配套工具，自有工厂，具备专业化生产，欢迎各位朋友和老板洽谈合作！！收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-221701142400933e84", "shop_url": "https://lbwshop888.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"13356880325\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市山东省青岛市平度市香港路118号华侨科技园\"}"}}, {"name": "平度市蒂睫眼睫毛厂", "phone": "15954217675", "main_categories": "主营:|假睫毛|双眼皮贴|美睫胶", "tags": "2025上榜二钻工厂|入围美睫胶服务榜 第7名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2200551154566063f2&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=756623333831,761265852285,761264656231,761433143374,761387094810,761441251353,761264656131,799216274926,761392286793,761255436663&aHdkaW5n_isUseGray=true", "name": "平度市蒂睫眼睫毛厂", "tags": "2025上榜二钻工厂|入围美睫胶服务榜 第7名", "main_categories": "主营:|假睫毛|双眼皮贴|美睫胶", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2018.12.03\",\"年交易额\":\"101~500万\",\"工厂面积\":\"1246m²\",\"员工总数\":\"55人\"}", "cooperation": "{\"定制起订量\":\"100套\",\"贴牌起订量\":\"100套\",\"接外贸订单\":\"支持\",\"加工方式\":\"清加工\",\"增值税发票\":\"无\"}", "showroom": "平度市蒂睫眼睫毛厂是假睫毛、彩妆、3D水貂毛、种植睫毛、磨尖眼睫毛等产品专业生产加工的公司，拥有完整、科学的质量管理体系。", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2200551154566063f2", "shop_url": "https://shop42468fh211813.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"15954217675\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市东阁街道办事处尚家上观工业园\"}"}}, {"name": "青岛帝腾睫毛有限公司", "phone": "13032100000", "main_categories": "主营:|假睫毛", "tags": "2025上榜二钻工厂|入围假睫毛新晋榜 第16名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2217981959593e0840&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=902845745368,902283692298,902276192339,900643245115,902271116574,901546917677,896223730059,901031964340,874060814853,902280108393&aHdkaW5n_isUseGray=true", "name": "青岛帝腾睫毛有限公司", "tags": "2025上榜二钻工厂|入围假睫毛新晋榜 第16名", "main_categories": "主营:|假睫毛", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2024.01.11\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"2376m²\",\"员工总数\":\"51人\"}", "cooperation": "{\"定制起订量\":\"1件\",\"贴牌起订量\":\"1件\",\"接外贸订单\":\"支持\",\"加工方式\":\"清加工 来图加工 来样加工 包工包料\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "接代加工，分销等\n日产10W+\n致娴品牌唯一官方店铺", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2217981959593e0840", "shop_url": "https://shop951rs3k735642.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 000 15555557210\",\"手机\":\"13032100000\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市店前工业园青岛帝腾睫毛有限公司\"}"}}, {"name": "青岛星耀半岛商贸有限公司", "phone": "15666203222", "main_categories": "", "tags": "入围假睫毛热度榜 第15名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2212977367051b7de2&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=693497431482,683493144224,683490840823,669899689705,679922226742,678117972718,675675473887,671570338280,682273737441,678615989719&aHdkaW5n_isUseGray=true", "name": "青岛星耀半岛商贸有限公司", "tags": "入围假睫毛热度榜 第15名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2021.12.23\",\"年交易额\":\"501~1000万\",\"员工总数\":\"11~50人\"}", "cooperation": "{\"定制起订量\":\"100套\",\"贴牌起订量\":\"1000套\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"增值税发票\":\"无\"}", "showroom": "平度市星耀眼睫毛厂是假睫毛、彩妆、3D水貂毛、种植睫毛、磨尖眼睫毛等产品专业生产加工的公司，拥有完整、科学的质量管理体系。贴牌加工。一件代发", "sgs_report": "", "shop_url": "https://shop58724l761x687.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"15666203222\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市李园街道办事处金华街\"}"}}, {"name": "青岛月儿公主美妆有限公司", "phone": "15953214110", "main_categories": "主营:|假睫毛|假睫毛镊子|美睫胶", "tags": "2025上榜三钻工厂|入围美睫胶服务榜 第15名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-221982100764507af3&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=939746500144,939263681181,939791884136,939722348747,934923569713,939113536743,938633934716,938635522672,934916789938,934916789908&aHdkaW5n_isUseGray=true", "name": "青岛月儿公主美妆有限公司", "tags": "2025上榜三钻工厂|入围美睫胶服务榜 第15名", "main_categories": "主营:|假睫毛|假睫毛镊子|美睫胶", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2025.05.09\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"1206m²\",\"员工总数\":\"58人\"}", "cooperation": "{\"定制起订量\":\"1件\",\"贴牌起订量\":\"1件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"1%\",\"增值税发票\":\"有\"}", "showroom": "月儿公主假睫毛母公司是‌青岛月儿公主美妆有限公司，该公司位于中国假睫毛生产核心基地——青岛平度市，是一家拥有10年以上专业手工假睫毛生产经验的厂家。\n该厂专注于纯对毛假睫毛、朵毛假睫毛及密排种植睫毛的生产。产品长期出口欧美日韩等国际市场，以“技术+产品”为核心竞争力，在行业中占据领先地位。\n月儿公主假睫毛，以“精致如月，灵动如公主”为灵感，专为追求极致眼妆魅力的女性设计。品牌秉承“每一根睫毛都是艺术品”的理念，精选优质仿生纤维与柔软蚕丝蛋白材质，打造轻盈无感、却浓密卷翘的佩戴体验，宛如天生羽睫般自然灵动。\n月儿公主采用零胶刺技术，温和贴合眼部肌肤，敏感眼也能安心使用。搭配独家定制的弧形梗设计，贴合亚洲眼型，轻松佩戴不翘边，满足从甜美清新到华丽复古的全场景妆容需求。创立3D立体排布工艺，让睫毛根根分明，瞬间放大双眼。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-221982100764507af3", "shop_url": "https://shop010c006l28403.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"15953214110\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市凤台街道重庆路福德隆食品有限公司院内东侧17号\"}"}}, {"name": "广东睫领供应链科技有限公司", "phone": "13302236417", "main_categories": "主营:|假睫毛", "tags": "2025上榜二钻工厂|入围假睫毛热度榜 第17名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2211124105377357bf&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=731825965375,673281151156,679973658786,673319317119,679864912493,644383701649,706627316186,668077728412,742682462078,683431932355&aHdkaW5n_isUseGray=true", "name": "广东睫领供应链科技有限公司", "tags": "2025上榜二钻工厂|入围假睫毛热度榜 第17名", "main_categories": "主营:|假睫毛", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2010.01.12\",\"年交易额\":\"501~1000万\",\"工厂面积\":\"1184m²\",\"员工总数\":\"302人\"}", "cooperation": "{\"定制起订量\":\"1000盒\",\"贴牌起订量\":\"500盒\",\"接外贸订单\":\"支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"1%\",\"增值税发票\":\"有\"}", "showroom": "广东睫领科技有限公司专注高品质假睫毛制造十余年，一站式源头工厂，主营假睫毛：长短根朵毛、收尖朵毛、3D立体朵毛、密排系列、叶草系列、日化线产品等；按质按量的规模化生产能力，按期的交付能力，拥有专业的研发设计团队，提供OEM/ODM定制服务、纸卡设计、包材设计等，欢迎各界朋友莅临参观、指导和洽谈业务。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2211124105377357bf", "shop_url": "https://jeleap.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 020 28856560\",\"手机\":\"13302236417\",\"传真\":\"暂无\",\"地址\":\"广东省广州市天河区中山大道西140号2201室（广州办事处）\"}"}}, {"name": "平度市洛彩睫毛厂", "phone": "18561519068", "main_categories": "主营:|假睫毛|假睫毛镊子", "tags": "2025上榜工厂|入围假睫毛热度榜 第20名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2217516359097b112e&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=823429957611,823416782931,857153278514,853006305631,824738014251,961033405271,923259024609,857471601477,823429969347,921894471926&aHdkaW5n_isUseGray=true", "name": "平度市洛彩睫毛厂", "tags": "2025上榜工厂|入围假睫毛热度榜 第20名", "main_categories": "主营:|假睫毛|假睫毛镊子", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2023.11.08\",\"年交易额\":\"1000万~2000万\",\"工厂面积\":\"400m²\",\"员工总数\":\"12人\"}", "cooperation": "{\"定制起订量\":\"1000件\",\"贴牌起订量\":\"1000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"3%\",\"增值税发票\":\"有\"}", "showroom": "洛彩假睫毛工厂，常年生产各种睫毛，嫁接睫毛，对毛，彩毛等，诚信第一，专注品质。", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2217516359097b112e", "shop_url": "https://shop21l9x2029x971.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"18561519068\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市东阁街道办事处上李元村135\"}"}}, {"name": "平度市创美优品睫毛厂", "phone": "暂无", "main_categories": "", "tags": "入围假睫毛镊子服务榜 第15名|入围假睫毛镊子新晋榜 第5名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2218417686003d855d&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=855160330839,855707212706,839477695045,829022058363,898499850467,828159823049,828357178069,828691652906,855168529613,828170951313&aHdkaW5n_isUseGray=true", "name": "平度市创美优品睫毛厂", "tags": "入围假睫毛镊子服务榜 第15名|入围假睫毛镊子新晋榜 第5名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2023.08.16\",\"年交易额\":\"501~1000万\",\"员工总数\":\"51~100人\"}", "cooperation": "{\"定制起订量\":\"200个\",\"贴牌起订量\":\"200个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"包工包料 清加工 来样加工 来图加工\",\"开票点数\":\"3%\",\"增值税发票\":\"有\"}", "showroom": "平度市创美优品睫毛厂是假睫毛、分段式假睫毛、免胶假睫毛、上睫毛、下睫毛等产品专业生产加工的公司，拥有完整体系。平度市创美优品睫毛厂的诚信、实力和产品质量获得业界的认可。欢迎各界朋友莅临参观、指导和业务洽谈。收起更多", "sgs_report": "", "shop_url": "https://shop6655q4d3493b1.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"暂无\",\"传真\":\"暂无\",\"地址\":\"山东省青岛市平度市豪德商贸城51-16\"}"}}];
+
+const app = Vue.createApp({
+  data(){ return {
+    q: '',
+    raw: data,
+    page: 1,
+    perPage: 20,
+    hasImage: false,
+    detail: null
+  }},
+  computed: {
+    filtered(){
+      let q = this.q.trim().toLowerCase();
+      let arr = this.raw.slice();
+      if(this.hasImage) arr = arr.filter(x=>x.images && x.images.length);
+      if(q){
+        arr = arr.filter(f=>{
+          return (f.name||'').toLowerCase().includes(q)
+            || (f.main_categories||'').toLowerCase().includes(q)
+            || (f.tags||'').toLowerCase().includes(q)
+            || (f.phone||'').toLowerCase().includes(q);
+        });
+      }
+      return arr;
+    },
+    pages(){ return Math.max(1, Math.ceil(this.filtered.length / this.perPage)); },
+    paged(){ return this.filtered.slice((this.page-1)*this.perPage, this.page*this.perPage); }
+  },
+  methods:{
+    openDetail(f){ this.detail = f; window.scrollTo(0,0); },
+    prevPage(){ if(this.page>1) this.page--; },
+    nextPage(){ if(this.page<this.pages) this.page++; },
+    formatValue(v){
+      if(v===null || v===undefined || v==='') return '<span class="text-gray-400">—</span>';
+      let s = String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      s = s.replace(/(https?:\/\/[^\s,;]+)/g, '<a href="$1" target="_blank" class="text-blue-600 underline">$1</a>');
+      s = s.replace(/\n/g,'<br/>');
+      return s;
+    }
+  },
+  watch:{
+    perPage(){ this.page = 1; },
+    q(){ this.page = 1; }
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
