@@ -5,47 +5,67 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>网址导航</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+<body class="bg-gradient-to-b from-blue-50 to-white text-gray-800 min-h-screen flex flex-col font-sans">
+
   <!-- 顶部标题 -->
-  <header class="bg-blue-600 text-white py-4 shadow-md">
-    <div class="max-w-3xl mx-auto px-4">
-      <h1 class="text-2xl font-bold">我的导航</h1>
+  <header class="bg-blue-600 text-white py-6 shadow-lg">
+    <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+      <h1 class="text-3xl font-bold tracking-wide">📚 我的导航</h1>
+      <span class="text-sm opacity-80">快捷入口</span>
     </div>
   </header>
 
-  <!-- 链接列表 -->
-  <main class="flex-1 max-w-3xl mx-auto px-4 py-6 space-y-3">
-    <!-- 单条导航记录 -->
-    <a href="bra-sets-top30.html" target="_blank"
-       class="block w-full bg-white rounded-lg shadow hover:shadow-lg transition p-4">
-      <div class="text-lg font-semibold">1688</div>
-      <div class="text-gray-500 text-sm">文胸套装Top30</div>
-    </a>
+  <!-- Vue 挂载点 -->
+  <main id="app" class="flex-1 max-w-7xl mx-auto px-6 py-10 space-y-10">
 
-    <a href="bra-no-top20.html" target="_blank"
-       class="block w-full bg-white rounded-lg shadow hover:shadow-lg transition p-4">
-      <div class="text-lg font-semibold">1688</div>
-      <div class="text-gray-500 text-sm">无痕文胸Top20</div>
-    </a>
-
-    <a href="fake-jiemao-top20.html" target="_blank"
-       class="block w-full bg-white rounded-lg shadow hover:shadow-lg transition p-4">
-      <div class="text-lg font-semibold">1688</div>
-      <div class="text-gray-500 text-sm">假睫毛Top20</div>
-    </a>
-    <a href="huazhuanggongju.html" target="_blank"
-       class="block w-full bg-white rounded-lg shadow hover:shadow-lg transition p-4">
-      <div class="text-lg font-semibold">1688</div>
-      <div class="text-gray-500 text-sm">美妆工具80家</div>
-    </a>
-    
+    <!-- 分组 -->
+    <section v-for="(group, gIndex) in navGroups" :key="gIndex">
+      <h2 class="text-2xl font-semibold mb-6 text-gray-700 border-l-4 border-blue-500 pl-3">
+        {{ group.title }}
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <a v-for="(item, index) in group.links" :key="index"
+           :href="item.url"
+           :target="isMobile ? '_self' : '_blank'"
+           class="group bg-white rounded-xl shadow-md hover:shadow-xl transition transform hover:-translate-y-1 p-6">
+          <div class="text-xl font-bold text-blue-600">{{ item.site }}</div>
+          <div class="text-gray-500 text-sm mt-1">{{ item.desc }}</div>
+        </a>
+      </div>
+    </section>
 
   </main>
 
   <!-- 底部版权 -->
-  <footer class="bg-gray-100 text-center py-4 text-sm text-gray-500">
-    © 2025 我的导航
+  <footer class="bg-gray-100 border-t text-center py-6 text-sm text-gray-500">
+    © 2025 导航
   </footer>
+
+  <!-- Vue 脚本 -->
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          isMobile: /Mobi|Android|iPhone/i.test(navigator.userAgent),
+          navGroups: [
+            {
+              title: "🔥 1688 工厂信息",
+              links: [
+                { site: "1688", desc: "文胸套装 Top30", url: "bra-sets-top30.html" },
+                { site: "1688", desc: "无痕文胸 Top20", url: "bra-no-top20.html" },
+                { site: "1688", desc: "假睫毛 Top20", url: "fake-jiemao-top20.html" },
+                { site: "1688", desc: "美妆工具 80 家", url: "huazhuanggongju.html" }
+              ]
+            }
+          ]
+        }
+      }
+    }).mount("#app");
+  </script>
+
 </body>
 </html>
