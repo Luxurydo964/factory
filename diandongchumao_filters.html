@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>工厂列表</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="app" class="min-h-screen p-4 md:p-8">
+    <header class="max-w-6xl mx-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl md:text-3xl font-bold">工厂列表</h1>
+        <div>
+          <input v-model="q" placeholder="搜索名称 / 类别 / 标签" class="border rounded px-3 py-1 w-60" />
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto grid gap-6 md:grid-cols-3 sm:grid-cols-2 grid-cols-1">
+      <section class="col-span-1 md:col-span-2">
+        <div class="bg-white shadow rounded p-4">
+          <div v-if="filtered.length===0" class="py-8 text-center text-gray-500">没有匹配的工厂</div>
+          <ul>
+            <li v-for="(f, idx) in paged" :key="idx" class="border-b last:border-b-0">
+              <div class="flex items-center p-3 hover:bg-gray-50">
+                <div class="w-20 h-12 flex-shrink-0 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
+                  <img v-if="f.images && f.images.length" :src="f.images[0]" alt="logo" class="w-full object-cover" />
+                  <svg v-else xmlns='http://www.w3.org/2000/svg' class='w-6 h-6 text-gray-400' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 7a4 4 0 014-4h10a4 4 0 014 4v10a4 4 0 01-4 4H7a4 4 0 01-4-4V7z' /></svg>
+                </div>
+                <div class="ml-3 flex-1">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="font-semibold text-lg">{{ f.name || "(无名称)" }}</div>
+                      <div class="text-sm text-gray-600">{{ f.main_categories }}</div>
+                    </div>
+                    <div class="text-right text-sm text-gray-600">
+                      <div>联系方式</div>
+                      <div class="font-medium">{{ f.phone }}</div>
+                    </div>
+                  </div>
+                  <div class="mt-2 text-sm text-gray-500">
+                    标签: <span style="background: #e70606;color: #fff;padding: 2px;border-radius: 5px;" v-if="f.grade">{{f.grade}}</span>
+                    <span v-if="f.tags">{{ f.tags }}</span><span v-else>—</span>
+
+                  </div>
+
+                <div class="mt-2 text-sm text-black-500 font-semibold" v-if="f.price">
+                    价格区间(RMB): <span v-if="f.price">{{ f.price }}</span>
+                  </div>
+                      <div class="mt-2 text-sm text-black-500 font-semibold" v-if="f.remark">
+                    备注: <span v-if="f.remark">{{ f.remark }}</span>
+                  </div>
+                  <div class="mt-2">
+                    <button @click="openDetail(f)" class="px-3 py-1 rounded bg-blue-600 text-white text-sm">详情</button>
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+
+          <div class="flex items-center justify-between mt-4">
+            <div class="text-sm text-gray-600">共 {{ filtered.length }} 条</div>
+            <div class="space-x-2">
+              <button @click="prevPage" :disabled="page===1" class="px-2 py-1 border rounded disabled:opacity-50">上一页</button>
+              <button @click="nextPage" :disabled="page>=pages" class="px-2 py-1 border rounded disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <aside class="col-span-1">
+        <div class="bg-white shadow rounded p-4">
+          <h2 class="font-semibold mb-2">筛选</h2>
+          <div class="mb-2">
+            <label class="text-sm text-gray-600">页面大小</label>
+            <select v-model.number="perPage" class="w-full border rounded px-2 py-1">
+              <option v-for="n in [10,20,50,100]" :value="n">{{ n }}</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="text-sm text-gray-600">只显示有图片</label>
+            <input type="checkbox" v-model="hasImage" class="ml-2" />
+          </div>
+          <div class="text-sm text-gray-600 mt-4">点击列表中“详情”查看全部信息并跳转。</div>
+        </div>
+      </aside>
+    </main>
+
+    <div v-if="detail" class="fixed inset-0 bg-black/40 flex items-start md:items-center justify-center p-4 z-50">
+      <div class="bg-white rounded shadow max-w-4xl w-full max-h-[90vh] overflow-auto">
+        <div class="flex items-center justify-between p-4 border-b">
+          <div class="text-lg font-semibold">{{ detail.name || "(无名称)" }}</div>
+          <div><button @click="detail=null" class="px-3 py-1 border rounded">关闭</button></div>
+        </div>
+        <div class="p-4 grid gap-4 md:grid-cols-3">
+          <div class="md:col-span-2">
+          <div class="mb-4">
+              <div class="text-sm text-gray-600">工厂简介</div>
+              <div class="font-medium text-lg">{{ detail.raw.showroom }}</div>
+<!--              <div class="text-sm text-gray-500 mt-2" v-if="detail.raw.contact_info">{{ detail.raw.contact_info }}</div>-->
+            </div>
+       <div class="mb-4">
+              <div class="text-sm text-gray-600">1688店铺</div>
+                <a :href="detail.raw.shop_url" target="_blank" class="text-blue-600 underline">点击进入</a>
+<!--              <div class="text-sm text-gray-500 mt-2" v-if="detail.raw.contact_info">{{ detail.raw.contact_info }}</div>-->
+            </div>
+
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">联系方式</div>
+              <div class="font-medium text-lg">{{ detail.phone }}</div>
+<!--              <div class="text-sm text-gray-500 mt-2" v-if="detail.raw.contact_info">{{ detail.raw.contact_info }}</div>-->
+            </div>
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">主营目录</div>
+              <div class="font-medium">{{ detail.main_categories }}</div>
+            </div>
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">标签</div>
+              <div>{{ detail.tags }}</div>
+            </div>
+
+<div class="mb-4" v-if="Object.keys(detail.raw).length">
+  <h3 class="font-semibold mb-2">详细信息</h3>
+
+  <!-- 基本信息 -->
+  <div v-if="detail.raw.profile">
+    <h4 class="font-medium mt-2 mb-1">基本信息</h4>
+    <table class="min-w-full text-sm border">
+      <tbody>
+        <tr v-for="(v,k) in parseJson(detail.raw.profile)" :key="'profile-'+k" class="border-t">
+          <td class="py-2 align-top font-medium w-40 text-gray-700">{{ k }}</td>
+          <td class="py-2" v-html="formatValue(v)"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 合作模式 -->
+  <div v-if="detail.raw.cooperation">
+    <h4 class="font-medium mt-4 mb-1">合作模式</h4>
+    <table class="min-w-full text-sm border">
+      <tbody>
+        <tr v-for="(v,k) in parseJson(detail.raw.cooperation)" :key="'coop-'+k" class="border-t">
+          <td class="py-2 align-top font-medium w-40 text-gray-700">{{ k }}</td>
+          <td class="py-2" v-html="formatValue(v)"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 联系方式 -->
+  <div v-if="detail.raw.contact_info">
+    <h4 class="font-medium mt-4 mb-1">联系方式</h4>
+    <table class="min-w-full text-sm border">
+      <tbody>
+        <tr v-for="(v,k) in parseJson(detail.raw.contact_info)" :key="'contact-'+k" class="border-t">
+          <td class="py-2 align-top font-medium w-40 text-gray-700">{{ k }}</td>
+          <td class="py-2" v-html="formatValue(v)"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 验厂报告 -->
+  <div v-if="detail.raw.sgs_report">
+    <h4 class="font-medium mt-4 mb-1">验厂报告</h4>
+    <a :href="detail.raw.sgs_report" target="_blank" class="text-blue-600 underline">点击查看</a>
+  </div>
+</div>
+
+
+
+          </div>
+
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+/* 数据占位符 — 生成时由 Python 替换为 JSON 列表 */
+const data = [{"name": "余姚市泗门希波顿电器厂", "phone": "13819501340", "main_categories": "主营:|脱毛/剃毛器|理发器|电动剃须刀", "tags": "2025上榜三钻工厂|入围电动剃须刀实力榜 第12名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"price": "电池款15元起 充电款23-50", "remark": "提供mini口红款,双头款", "grade": "中端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-275466658743192&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=754141399258,753882008753,750850103106,769936869850,739719083629,752258123639,738854734577,742928375575,727764119060,712251852519&aHdkaW5n_isUseGray=true", "name": "余姚市泗门希波顿电器厂", "tags": "2025上榜三钻工厂|入围电动剃须刀实力榜 第12名", "main_categories": "主营:|脱毛/剃毛器|理发器|电动剃须刀", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2010.07.22\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"11000m²\",\"员工总数\":\"347人\"}", "cooperation": "{\"定制起订量\":\"3000台\",\"贴牌起订量\":\"1000台\",\"接外贸订单\":\"支持\",\"加工方式\":\"包工包料 来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "余姚市泗门希波顿电器厂成立于2010年，现有员工300余名，占地21000㎡。主要生产女士剃毛器、电动修眉刀、男士体毛剪、电动理发剪、电动剃须刀、毛孔清洁器，有着十多年行业经验。公司具有一套完善的产品开发、设计、生产、销售一体化的链路体系。除现货产品外，还可承接ODM、OEM订单。国外市场远销日本、韩国、东南亚、欧美等国家。国内市场和奥克斯、朗菲、艾优等知名品牌公司有过代加工合作。我们始终相信质量是企业的生命，是企业发展的灵魂和竞争的核心，建立严格的质量体系才是产品质量的保证！ 本着品质为上、诚信为本的理念服务于顾客，欢迎各界朋友莅临参观指导和业务洽谈！收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-275466658743192", "shop_url": "https://smxibodun.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0574 62178133\",\"手机\":\"13819501340\",\"传真\":\"86 0574 62178133\",\"地址\":\"浙江省宁波市余姚市泗门镇镇南村泗马公路南村委旁\"}"}, "price": "电池款15元起 充电款23-50", "remark": "提供mini口红款,双头款", "grade": "中端"}, {"name": "温州市凯锐电器有限公司", "phone": "86 577 86256677", "main_categories": "主营:|理发器|电动剃须刀|脱毛/剃毛器", "tags": "2025上榜三钻工厂|入围理发器实力榜 第4名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"price": "45-75", "remark": "提供多合一款式(剃毛,拔毛,磨脚)", "grade": "中高端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=chrihao&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=711316789259,642568794540,637071569776,970572396329,780705778325,826363151610,948009441091,932605752915,778060681401,967808490802&aHdkaW5n_isUseGray=true", "name": "温州市凯锐电器有限公司", "tags": "2025上榜三钻工厂|入围理发器实力榜 第4名", "main_categories": "主营:|理发器|电动剃须刀|脱毛/剃毛器", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2004.04.29\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"5020m²\",\"员工总数\":\"130人\"}", "cooperation": "{\"定制起订量\":\"2000件\",\"贴牌起订量\":\"2000件\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 轻加工 来样加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "温州市凯锐电器有限公司是日用电器领域，宏扬民族品牌的重要平台。凯锐电器以时尚新颖的生活小家电产品为主。拥有雄厚的人才资源和核心技术资源。我们正在努力研发新科技产品，争取提高品牌的美誉度和影响力。自有工厂建立在温州，占据面积8000平方米，现货十分充分稳定，且支持OEM贴牌定制，以及免费提供亚马逊卖家贴条形码、FBA箱唛。物品们的主营产品为电动剃须刀、理发器、宠物剪、女士拔毛器、电吹风等系列小家电。产品远销欧盟、日本、美国、俄罗斯等三十多个国家和地区。且拥有自主专利：产品大部分都是国内专利，每款均为自主研发或是公模产品，不存在侵权。合作代工工厂自有专利。我们增强对产品的质量进行层层把关产品出厂均全检，生产流程全部采用ISO9001质量管\n理，引进国内外先进设备以及生产管理，并大力开发创新型和环保型产品。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=chrihao", "shop_url": "https://zjkairui.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 577 86256677\",\"手机\":\"暂无\",\"传真\":\"86 577 886256655\",\"地址\":\"浙江省温州市瓯海区南白象街道鹅兴路130号\"}"}, "price": "45-75", "remark": "提供多合一款式(剃毛,拔毛,磨脚)", "grade": "中高端"}, {"name": "温州市航宏电子科技有限公司", "phone": "18758797891", "main_categories": "主营:|脱毛/剃毛器|电动刮痧仪|电动磨甲器", "tags": "2025上榜二钻工厂|入围电动刮痧仪实力榜 第6名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"price": "6.9-20", "remark": "口红款(修眉器、剃毛器),", "grade": "低中端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-22155251007583c274&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=917132848369,915711755804,917034080120,922750271518,923654649651,916603149884,924115920497,926813080427,923110442811&aHdkaW5n_isUseGray=true", "name": "温州市航宏电子科技有限公司", "tags": "2025上榜二钻工厂|入围电动刮痧仪实力榜 第6名", "main_categories": "主营:|脱毛/剃毛器|电动刮痧仪|电动磨甲器", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2023.02.27\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"2700m²\",\"员工总数\":\"68人\"}", "cooperation": "{\"定制起订量\":\"500套\",\"贴牌起订量\":\"500套\",\"接外贸订单\":\"支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"11%\",\"增值税发票\":\"有\"}", "showroom": "温州市航宏电子科技有限公司是专业生产加工按摩器材、小家电、家居日用品等电子产品的公司，拥有完整、科学的质量管理体系。公司拥有3600多平方车间，总日产能超12万，设备达100多台。从开发模具到原材料注塑，再到产品组装，皆由我们自己管控，杜绝中间商差价，且每道环节都有专门的质检人员把关，坚持以实在的价格卖质量够硬的产品，是我们公司成立以来坚守的原则。我们的诚信、实力和产品质量也获得了业界的认可，欢迎各界朋友莅临参观、指导和业务洽谈。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-22155251007583c274", "shop_url": "https://shop13m2477r738o1.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0577 65590571\",\"手机\":\"18758797891\",\"传真\":\"暂无\",\"地址\":\"浙江省温州市平阳县昆阳镇新村路189号\"}"}, "price": "6.9-20", "remark": "口红款(修眉器、剃毛器),", "grade": "低中端"}, {"name": "余姚市时锋电器厂", "phone": "13385848018", "main_categories": "主营:|脱毛/剃毛器|电动修眉刀|个护电器配件", "tags": "2025上榜二钻工厂|入围个护电器配件实力榜 第13名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"price": "15-40", "remark": "剃毛,拔毛 ,修眉. 最贵的提供四合一款式", "grade": "中端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2208429269033e8092&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=859158255984,732062419259,674770644709,678344838835,630943409279,669183025875,725017504756,684613050041,678641854808,753647435079&aHdkaW5n_isUseGray=true", "name": "余姚市时锋电器厂", "tags": "2025上榜二钻工厂|入围个护电器配件实力榜 第13名", "main_categories": "主营:|脱毛/剃毛器|电动修眉刀|个护电器配件", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2020.02.18\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"3869m²\",\"员工总数\":\"42人\"}", "cooperation": "{\"定制起订量\":\"2000个\",\"贴牌起订量\":\"2000个\",\"接外贸订单\":\"支持\",\"加工方式\":\"来图加工 来样加工 包工包料 清加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "品牌介绍\n余姚市时锋电器厂致力于剃毛器、剃须刀、修眉器、拔毛器等美容美发仪器生产的企业，公司具有集产品的开发、设计、生产、销售一体化的企业，除开发产品外，还可承接ODM/OEM订单。\n\n公司理念\n本公司以创新的开发理念，打造市场需求的产品，拥有科学的管理体系，本着品质为上、诚信为本的理念服务于顾客，欢迎各界朋友莅临参观指导和业务洽谈。\n收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2208429269033e8092", "shop_url": "https://shifengdianqi.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0574 62161556\",\"手机\":\"13385848018\",\"传真\":\"86 0574 62161556\",\"地址\":\"浙江省宁波市余姚市泗门镇协力路4号7栋1单元\"}"}, "price": "15-40", "remark": "剃毛,拔毛 ,修眉. 最贵的提供四合一款式", "grade": "中端"}, {"name": "宁波市伊尚电器有限公司", "phone": "13705846770", "main_categories": "主营:|理发器|脱毛/剃毛器|毛球修剪器", "tags": "2025上榜一钻工厂|入围毛球修剪器热度榜 第12名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"price": "30-75", "remark": "多合一 ", "grade": "中高端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=nbyang2009&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=812206256418,865931713512,595941243766,704244498990,669475028551,637704645866,810409642315,810650412546,810415666359,640104276564&aHdkaW5n_isUseGray=true", "name": "宁波市伊尚电器有限公司", "tags": "2025上榜一钻工厂|入围毛球修剪器热度榜 第12名", "main_categories": "主营:|理发器|脱毛/剃毛器|毛球修剪器", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2017.11.08\",\"年交易额\":\"1000万~2000万\",\"工厂面积\":\"5400m²\",\"员工总数\":\"59人\"}", "cooperation": "{\"定制起订量\":\"1000套\",\"贴牌起订量\":\"1000套\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 来样加工 包工包料\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "宁波市伊尚电器有限公司位于位于中国余姚市，跨海大桥的桥头堡，杭州湾大桥，靠近上海杭州宁波高速公路，地理位置优越，交通便利。\n公司专业生产电推剪、剃毛器、毛球修剪器等各种个护小家电等。我们拥有完整、科学的质量管理体系，许多不同类型的测试设备，专业操作人员和成熟的管理体系。\n我们的口号是“客户至上，创新企业”，公司一直把客户的利益放在首位。为所有客户提供高质量的服务。我们始终相信质量是企业的生命，是企业发展的灵魂和竞争的核心，建立严格的质量体系才是产品质量的保证！\n有质量，有产量，有服务的我们，竭诚欢迎国内外客户前来指导、参观、洽谈业务。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=nbyang2009", "shop_url": "https://nbyang2009.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0574 63325308\",\"手机\":\"13705846770\",\"传真\":\"86 0574 63325317\",\"地址\":\"浙江省宁波市余姚市郎霞街道 新新村 桥南路 50-1号\"}"}, "price": "30-75", "remark": "多合一 ", "grade": "中高端"}, {"name": "东莞市思达电子有限公司", "phone": "13886090641", "main_categories": "", "tags": "入围磨脚器服务榜 第2名|入围磨脚器热度榜 第7名", "images": [], "raw": {"price": "25-50", "remark": "液晶显示", "grade": "中端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-221270815185256f00&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=710603707724,712574211636,949669119949,708645733370,709264091740,817398664065,709000442561,901118278437,923155969177,850263969734&aHdkaW5n_isUseGray=true", "name": "东莞市思达电子有限公司", "tags": "入围磨脚器服务榜 第2名|入围磨脚器热度榜 第7名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2019.12.18\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"3320m²\",\"员工总数\":\"50人\"}", "cooperation": "{\"定制起订量\":\"1000个\",\"贴牌起订量\":\"500个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"包工包料 来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "东莞市思达电子有限公司位于广东省东莞市长安镇，是一家集研发、生产、销售、服务一体的高新技术企业，旨在为全球客户提供洁净舒适、健康美丽的个护产品及健康生活电器产品。\n思达工厂总面积达3500平方余米现代化厂房仓库和全自动流水线及检测设备。员工200余人，设计部8人。\n公司现有一支高学历的研发团队，秉持持续创新、提供用户简单生活、美丽自信的产品的企业使命，陆续推出了具有核心知识产权及自主品牌“须扬”的剃须刀、鼻毛刀、修眉刀、理发器、剃毛器、电动牙刷、冲牙器、磨脚器、磨甲器等个护产品及自主品牌“速狐”的便携式电吹风、冷风扇、暖风机、暖脚器、电熨斗等生活电器产品。\n思达所推出的多款产品因设计新颖、品质优良畅销各大电商平台并远销欧美、中东及东南亚市场。公司拥有一批高素质的运营管理团队，秉承“科技创新、品质保证、客户至上、合作共赢”的经营宗旨，获得\"AAA级信用企业”及“守合同重信用企业”荣誉称号。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-221270815185256f00", "shop_url": "https://dgsidar.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"13886090641\",\"传真\":\"暂无\",\"地址\":\"广东省东莞市长安镇锦夏河东2路48号\"}"}, "price": "25-50", "remark": "液晶显示", "grade": "中端"}, {"name": "温州市洪渊电子科技有限公司", "phone": "15968723317", "main_categories": "主营:|电动磨甲器|筋膜枪|脱毛/剃毛器", "tags": "2025上榜二钻工厂|入围脱毛/剃毛器服务榜 第6名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"price": "22-35", "remark": "外形有辨识度,提供多国说明书", "grade": "中端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2215891042524c9dbc&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=926277166473,960689669961,809710823970,963219336188,945569661332&aHdkaW5n_isUseGray=true", "name": "温州市洪渊电子科技有限公司", "tags": "2025上榜二钻工厂|入围脱毛/剃毛器服务榜 第6名", "main_categories": "主营:|电动磨甲器|筋膜枪|脱毛/剃毛器", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2023.05.16\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"1100m²\",\"员工总数\":\"37人\"}", "cooperation": "{\"定制起订量\":\"100件\",\"贴牌起订量\":\"100件\",\"接外贸订单\":\"支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "温州洪渊电子科技有限公司，位于小家电生产基地浙江省温州市平阳县，厂房面积3800平方，是一家以按摩器具及家用电器生产、研发、销售为一体的创新科技型企业。主要生产有足疗机、按摩枕、按摩披肩、按摩靠垫美甲打磨机等多类型按摩产品， 拥有自己实力较强的研发团队，从高素质人才的培养到现代化生产线制造，每一个产品的力度都反复调试。每一个产品都经得起市场的考验，公司拥有自己的全制动一体螺丝机，全自动注塑机，现代化生产流水线等多项先进设备，年产量可达200万台，远销欧美日韩等多个国家地区，从原材料到配件，再从配件组装成品多条流水线作业，支持来图定制，来样定制，新品开发等一条龙生产模式，质量高，效率高，每个环节都配备质检人员把关，通过多种检验环节，把控产品质量。我们的技术人员可以给每个销售商提供售后技术支持，让每个客户都售后无忧。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2215891042524c9dbc", "shop_url": "https://shop47711308qq323.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"15968723317\",\"传真\":\"暂无\",\"地址\":\"浙江省温州市平阳县雪之梦34幢3楼\"}"}, "price": "22-35", "remark": "外形有辨识度,提供多国说明书", "grade": "中端"}, {"name": "深圳市美莱雅智能科技有限公司", "phone": "15728711745", "main_categories": "", "tags": "入围电子美容仪服务榜 第13名", "images": [], "raw": {"price": "200+", "remark": "脉冲脱毛 ,光子脱毛", "grade": "高端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-221701972707839c89&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=800765810505&aHdkaW5n_isUseGray=true", "name": "深圳市美莱雅智能科技有限公司", "tags": "入围电子美容仪服务榜 第13名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2021.12.15\",\"年交易额\":\"2000万以上\",\"员工总数\":\"101~200人\"}", "cooperation": "{\"定制起订量\":\"500件\",\"贴牌起订量\":\"500件\",\"接外贸订单\":\"支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "深圳市美莱雅智能科技有限公司是一家专注于家用美容仪的研发、生\n产、销售为一体的高科技型企业。公司成立以来，提倡“科学皮肤管\n理”，致力于通过科学、安全的产品，既满足用户舒适体验感的同时\n又能保证显著效果。并拥有行业权威创新专利100+，上千项认证资\n质和报告，技术力量领先市场5年，产品符合国标认证。数十年专注\n家用美容仪领域，秉承着“专注品质，体验至上”的原则，持续为广\n大供应商和用户提供高效、安全、智能的脱毛仪及射频仪产品，品\n牌在欧美、日本、韩国中东等30多个国家和地区备受追捧，掀起了\n一股“爱美”风暴。收起更多", "sgs_report": "", "shop_url": "https://shop56t74lo802732.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"15728711745\",\"传真\":\"暂无\",\"地址\":\"广东省深圳市宝安区广东深圳宝安区福永街道怀德社区翠岗二区28栋\"}"}, "price": "200+", "remark": "脉冲脱毛 ,光子脱毛", "grade": "高端"}, {"name": "佛山市华达电子科技有限公司", "phone": "13719240415", "main_categories": "", "tags": "入围个护电器配件实力榜 第14名|入围个护电器配件新晋榜 第8名", "images": [], "raw": {"price": "47-77", "remark": "", "grade": "中高端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2219157348490dc6a1&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=893301603422,892450513525,886277727857,892586919014,913764243991,887324652775,961278292298,956525274110,877035249549,890193366797&aHdkaW5n_isUseGray=true", "name": "佛山市华达电子科技有限公司", "tags": "入围个护电器配件实力榜 第14名|入围个护电器配件新晋榜 第8名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2021.06.01\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"1429m²\",\"员工总数\":\"44人\"}", "cooperation": "{\"定制起订量\":\"1000台\",\"贴牌起订量\":\"100台\",\"接外贸订单\":\"支持\",\"加工方式\":\"包工包料 来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "佛山市华达科技有限公司是一家领先的个人护理产品的供应商，专业生产身体剃毛器和胡须修剪器。我们拥有2000多平方米的生产车间和100多个私人模具，通过一站式解决方案满足多样化的采购需求。\n     我们拥有先进的生产设施，包括10台SMT机器、7台印刷机和2套AOI设备，使我们能够每年生产360多万台，确保产品质量的一致性。 \n除了生产，我们还提供全面的销售解决方案，包括市场调研、热销商品建议和专业的产品视频媒体。我们的OEM订单只需要100件起，我们提供DDP运输以简化清关。工厂常备大量库存，我们可以在3天内快速发货。 \n     我们的工厂通过了ISO 9001认证，拥有各种实用和外观专利，以及CE、RoHS、FCC和UKCA认证。我们自豪地将我们的产品出口到美国、墨西哥、巴西、智利、沙特阿拉伯、阿联酋、以色列、日本、新加坡和许多其他国家。\n 我们期待着有机会促进您的业务增长。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2219157348490dc6a1", "shop_url": "https://shop21958050y8787.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"13719240415\",\"传真\":\"暂无\",\"地址\":\"广东省佛山市顺德区北滘镇顺江社区三乐东路23号涛汇家电园6栋403-404\"}"}, "price": "47-77", "remark": "", "grade": "中高端"}, {"name": "美技美容科技(深圳)有限公司", "phone": "19068013505", "main_categories": "", "tags": "入围睫毛夹服务榜 第19名|入围吸鼻器热度榜 第1名", "images": [], "raw": {"price": "40-899", "remark": "", "grade": "中高端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-220655900059175195&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=830554990011,819174690384,935388568873,943674091933,949015006634,949364318379,943825801794,712722073442,874279456486,838551401536&aHdkaW5n_isUseGray=true", "name": "美技美容科技(深圳)有限公司", "tags": "入围睫毛夹服务榜 第19名|入围吸鼻器热度榜 第1名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2016.04.18\",\"年交易额\":\"2000万以上\",\"员工总数\":\"51~100人\"}", "cooperation": "{\"定制起订量\":\"1000套\",\"贴牌起订量\":\"200套\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工 包工包料 清加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "美技美容科技(深圳)有限公司（简称：美技）-----坐落于“造梦之都,奋斗之城----深圳”美技是一家集产品设计，开模，制模，注塑，生产，销售于一体，拥有装备完善的生产设备与生产基地，专业从事家用电器，个人护理，电子美容产品，电子礼品，品牌OEM代工为主。我们将“以诚信为本，顾客至上的宗旨”，视为我们企业生存的灵魂，与广大新老客户竭诚合作，开拓国内外市场，共创辉煌的明天。公司秉承“顾客至上，锐意进取”的经营理念，坚持“客户第一”的原则为广大客户提供优质的服务。 \n欢迎各界朋友莅临参观、指导和业务洽谈。收起更多", "sgs_report": "", "shop_url": "https://magitech2019.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"19068013505\",\"传真\":\"暂无\",\"地址\":\"广东省深圳市龙岗区龙城街道嶂背社区嶂背路466号4栋601、1栋101、1栋401\"}"}, "price": "40-899", "remark": "", "grade": "中高端"}, {"name": "深圳暹境科技有限公司", "phone": "19075697004", "main_categories": "", "tags": "入围脱毛/剃毛器新晋榜 第1名|入围电动睫毛卷翘器热度榜 第3名", "images": [], "raw": {"price": "39-66", "remark": "", "grade": "中端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-221866027311530e7f&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=954510669442,928061107697,951404832361,932524319766,953197081086,972910872197,953192621629,854359655296,949386408200,961996179077&aHdkaW5n_isUseGray=true", "name": "深圳暹境科技有限公司", "tags": "入围脱毛/剃毛器新晋榜 第1名|入围电动睫毛卷翘器热度榜 第3名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2024.09.18\",\"年交易额\":\"2000万以上\",\"员工总数\":\"101~200人\"}", "cooperation": "{\"定制起订量\":\"500个\",\"贴牌起订量\":\"1000个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来样加工 来图加工\",\"开票点数\":\"3%\",\"增值税发票\":\"有\"}", "showroom": "本公司主要研发及生产电子科技产品", "sgs_report": "", "shop_url": "https://shop79g780254o050.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0755 19075697004\",\"手机\":\"19075697004\",\"传真\":\"暂无\",\"地址\":\"广东省深圳市龙岗区龙城街道\"}"}, "price": "39-66", "remark": "", "grade": "中端"}, {"name": "深圳华锐博电器有限公司", "phone": "13600412127", "main_categories": "", "tags": "入围脱毛/剃毛器热度榜 第5名", "images": [], "raw": {"price": "200+", "remark": "激光脱毛", "grade": "高端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-30669240338e904&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=923561377076,695721441950,916212505103,918617097250,952610678546,923727616675,592978713742,952136147655&aHdkaW5n_isUseGray=true", "name": "深圳华锐博电器有限公司", "tags": "入围脱毛/剃毛器热度榜 第5名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2014.09.09\",\"年交易额\":\"501~1000万\",\"员工总数\":\"11~50人\"}", "cooperation": "{\"定制起订量\":\"100套\",\"贴牌起订量\":\"100套\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工 包工包料 来图加工 来样加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "深圳市华锐博光电有限公司是一家集产品研发、制造、销售、服务于一体的专业美容设备提供商。我们专注于美容护理电子产品和智能美容产品的设计、开发、生产。作为一家经验丰富的OEM&ODM制造商，深圳华锐博为全球客户提供最新设计的脱毛仪、射频美容仪和高速吹风机。所有产品都有自己的专利，外观独特，深受客户的欢迎。我们的产品都已通过CE、RoHS、PSE、FCC等国际认证。我们以专业的技术支持，高质量的产品以及完善的售后服务，吸引了来自世界各地的客户，尤其是美国，英国，德国，法国，越南，新加坡，土耳其，中东和南非等。\n&#160;\n多年来，我们一直承载着让智能美容设备进入千家万户的光荣使命！ 并且让每个人都可以轻松在家做美容护理， 让每个人都能成为更好的自己。同时，我们也会为了成为专业的全球美容设备提供商这个宏伟目标而不懈奋斗。\n\n经过多年的发展，深圳华锐博取得了很大的进步。我们一直致力于与客户互惠合作收起更多", "sgs_report": "", "shop_url": "https://huaruibo.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0755 86330569\",\"手机\":\"13600412127\",\"传真\":\"86 0755 86330569\",\"地址\":\"广东省深圳市龙华区大浪街道茶角坎工业区A栋3层\"}"}, "price": "200+", "remark": "激光脱毛", "grade": "高端"}, {"name": "广州艾渼智能科技有限公司", "phone": "13928875906", "main_categories": "主营:|脱毛/剃毛器|理发器|婴儿理发器", "tags": "2025上榜三钻工厂|入围脱毛/剃毛器热度榜 第8名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"price": "34-63", "remark": "外形有辨识度", "grade": "中端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2206494419253914ad&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=734495782667,820709949485,650147583146,737443657194,603863796707,798886558014,700627937837,714494724453,898068679831,924238454100&aHdkaW5n_isUseGray=true", "name": "广州艾渼智能科技有限公司", "tags": "2025上榜三钻工厂|入围脱毛/剃毛器热度榜 第8名", "main_categories": "主营:|脱毛/剃毛器|理发器|婴儿理发器", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2017.07.28\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"2200m²\",\"员工总数\":\"99人\"}", "cooperation": "{\"定制起订量\":\"32个\",\"贴牌起订量\":\"1000个\",\"接外贸订单\":\"支持\",\"加工方式\":\"来样加工 来图加工 包工包料 清加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "广州艾渼集研发、生产、销售于一体，拥有6500平米的现代化工厂和研发中心，主要从事个人护理电器、宠物电器等领域的OEM、ODM业务。\n公司所有产品皆自主研发，拥有专属外观专利、技术专利。产品涵盖婴童/成人理发器、体毛修剪器（剃毛器），专业电推剪、宠物电推剪、吸鼻器、电动牙刷\n等多个系列，累积200余款，各项产品专利311项。其中有10余款产品成为海外市场爆品。\n公司拥有独立的模塑车间，SMT贴片车间、刀头研麿车间，标准化组装车间，生产员工85人以上，组装生产线10条，月产能30万台以上，采用40多台先进的现代化生产设备及检测设备，可提供从产品外观、结构、电控设计到模具生产、注塑、SMT贴片、组装、包装以及售后服务等一站式服务，实现了客户产品从0－1的整体输出。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2206494419253914ad", "shop_url": "https://aimei20030618.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 020 34545540\",\"手机\":\"13928875906\",\"传真\":\"暂无\",\"地址\":\"广州市番禺区钟村街钟盛路185号自编B栋二层\"}"}, "price": "34-63", "remark": "外形有辨识度", "grade": "中端"}, {"name": "浙江鼎尚电器有限公司", "phone": "18667411510", "main_categories": "", "tags": "入围脱毛/剃毛器热度榜 第9名", "images": [], "raw": {"price": "20-55", "remark": "多合一剃毛", "grade": "中端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-22111493465300a021&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=682096739726,682145166455,681733209599,681494804971,682326171055,674764977793,644874514929,656127423057,644251789793,662490208124&aHdkaW5n_isUseGray=true", "name": "浙江鼎尚电器有限公司", "tags": "入围脱毛/剃毛器热度榜 第9名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2020.09.29\",\"年交易额\":\"2000万以上\",\"企业面积\":\"400m²\",\"员工总数\":\"8人\"}", "cooperation": "{\"定制起订量\":\"1000个\",\"贴牌起订量\":\"3000个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "浙江鼎尚电器有限公司是一家主营理发器、剃须刀等个户小家电的工贸一体企业，办公室在国贸大厦701室，欢迎大家莅临指导！", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-22111493465300a021", "shop_url": "https://shop4213156561c48.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"18667411510\",\"传真\":\"暂无\",\"地址\":\"浙江省金华市义乌市江东街道东兴路51号\"}"}, "price": "20-55", "remark": "多合一剃毛", "grade": "中端"}, {"name": "宁波科乐雅电器有限公司", "phone": "暂无", "main_categories": "", "tags": "入围脱毛/剃毛器热度榜 第11名", "images": [], "raw": {"price": "22-55", "remark": "", "grade": "中端", "factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2206536131547a2d76&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=679451693158,693437305179,679926806606,693718250951,679975846888,731787931341,665041270900,643732949055,747997716316,652715167579&aHdkaW5n_isUseGray=true", "name": "宁波科乐雅电器有限公司", "tags": "入围脱毛/剃毛器热度榜 第11名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2019.03.15\",\"年交易额\":\"1000万~2000万\",\"工厂面积\":\"1800m²\",\"员工总数\":\"21人\"}", "cooperation": "{\"定制起订量\":\"3000个\",\"贴牌起订量\":\"3000个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来样加工 来图加工 轻加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "公司原名余姚卓央电器厂，从事小家电生产已有10余年，主要生产个人护理类小家电，两季产品小家电和照明类小电器。", "sgs_report": "", "shop_url": "https://nbkroaya.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"暂无\",\"传真\":\"暂无\",\"地址\":\"浙江省宁波市余姚市小曹娥镇海塘南村二区38号\"}"}, "price": "22-55", "remark": "", "grade": "中端"}];
+
+const app = Vue.createApp({
+  data(){ return {
+    q: '',
+    raw: data,
+    page: 1,
+    perPage: 20,
+    hasImage: false,
+    detail: null
+  }},
+  computed: {
+    filtered(){
+      let q = this.q.trim().toLowerCase();
+      let arr = this.raw.slice();
+      if(this.hasImage) arr = arr.filter(x=>x.images && x.images.length);
+      if(q){
+        arr = arr.filter(f=>{
+          return (f.name||'').toLowerCase().includes(q)
+            || (f.main_categories||'').toLowerCase().includes(q)
+            || (f.tags||'').toLowerCase().includes(q)
+            || (f.phone||'').toLowerCase().includes(q);
+        });
+      }
+      return arr;
+    },
+    pages(){ return Math.max(1, Math.ceil(this.filtered.length / this.perPage)); },
+    paged(){ return this.filtered.slice((this.page-1)*this.perPage, this.page*this.perPage); }
+  },
+  methods:{
+    openDetail(f){ this.detail = f; window.scrollTo(0,0); },
+    prevPage(){ if(this.page>1) this.page--; },
+    nextPage(){ if(this.page<this.pages) this.page++; },
+    formatValue(v){
+      if(v===null || v===undefined || v==='') return '<span class="text-gray-400">—</span>';
+      let s = String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      s = s.replace(/(https?:\/\/[^\s,;]+)/g, '<a href="$1" target="_blank" class="text-blue-600 underline">$1</a>');
+      s = s.replace(/\n/g,'<br/>');
+      return s;
+    },
+      parseJson(str){
+    try{
+      const obj = JSON.parse(str);
+      if(typeof obj === 'object' && obj !== null){
+        return obj;
+      }
+    }catch(e){}
+    return { 原文: str };
+  },
+  filteredOtherFields(raw){
+    const skipKeys = [
+      'factory_card_url','name','tags','honors','showroom','shop_url',
+      'profile','cooperation','sgs_report','contact_info'
+    ];
+    const out = {};
+    for(const [k,v] of Object.entries(raw)){
+      if(skipKeys.includes(k)) continue;
+      if(k === 'main_categories' && !v) continue;
+      out[k] = v;
+    }
+    return out;
+  }
+  },
+  watch:{
+    perPage(){ this.page = 1; },
+    q(){ this.page = 1; }
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
