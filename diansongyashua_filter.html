@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>工厂列表</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="app" class="min-h-screen p-4 md:p-8">
+    <header class="max-w-6xl mx-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl md:text-3xl font-bold">工厂列表</h1>
+        <div>
+          <input v-model="q" placeholder="搜索名称 / 类别 / 标签" class="border rounded px-3 py-1 w-60" />
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto grid gap-6 md:grid-cols-3 sm:grid-cols-2 grid-cols-1">
+      <section class="col-span-1 md:col-span-2">
+        <div class="bg-white shadow rounded p-4">
+          <div v-if="filtered.length===0" class="py-8 text-center text-gray-500">没有匹配的工厂</div>
+          <ul>
+            <li v-for="(f, idx) in paged" :key="idx" class="border-b last:border-b-0">
+              <div class="flex items-center p-3 hover:bg-gray-50">
+                <div class="w-20 h-12 flex-shrink-0 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
+                  <img v-if="f.images && f.images.length" :src="f.images[0]" alt="logo" class="w-full object-cover" />
+                  <svg v-else xmlns='http://www.w3.org/2000/svg' class='w-6 h-6 text-gray-400' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 7a4 4 0 014-4h10a4 4 0 014 4v10a4 4 0 01-4 4H7a4 4 0 01-4-4V7z' /></svg>
+                </div>
+                <div class="ml-3 flex-1">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="font-semibold text-lg">{{ f.name || "(无名称)" }}</div>
+                      <div class="text-sm text-gray-600">{{ f.main_categories }}</div>
+                    </div>
+                    <div class="text-right text-sm text-gray-600">
+                      <div>联系方式</div>
+                      <div class="font-medium">{{ f.phone }}</div>
+                    </div>
+                  </div>
+                  <div class="mt-2 text-sm text-gray-500">
+                    标签: <span style="background: #e70606;color: #fff;padding: 2px;border-radius: 5px;" v-if="f.grade">{{f.grade}}</span>
+                    <span v-if="f.tags">{{ f.tags }}</span><span v-else>—</span>
+
+                  </div>
+
+                <div class="mt-2 text-sm text-black-500 font-semibold" v-if="f.price">
+                    价格区间(RMB): <span v-if="f.price">{{ f.price }}</span>
+                  </div>
+                      <div class="mt-2 text-sm text-black-500 font-semibold" v-if="f.remark">
+                    备注: <span v-if="f.remark">{{ f.remark }}</span>
+                  </div>
+                  <div class="mt-2">
+                    <button @click="openDetail(f)" class="px-3 py-1 rounded bg-blue-600 text-white text-sm">详情</button>
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+
+          <div class="flex items-center justify-between mt-4">
+            <div class="text-sm text-gray-600">共 {{ filtered.length }} 条</div>
+            <div class="space-x-2">
+              <button @click="prevPage" :disabled="page===1" class="px-2 py-1 border rounded disabled:opacity-50">上一页</button>
+              <button @click="nextPage" :disabled="page>=pages" class="px-2 py-1 border rounded disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <aside class="col-span-1">
+        <div class="bg-white shadow rounded p-4">
+          <h2 class="font-semibold mb-2">筛选</h2>
+          <div class="mb-2">
+            <label class="text-sm text-gray-600">页面大小</label>
+            <select v-model.number="perPage" class="w-full border rounded px-2 py-1">
+              <option v-for="n in [10,20,50,100]" :value="n">{{ n }}</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="text-sm text-gray-600">只显示有图片</label>
+            <input type="checkbox" v-model="hasImage" class="ml-2" />
+          </div>
+          <div class="text-sm text-gray-600 mt-4">点击列表中“详情”查看全部信息并跳转。</div>
+        </div>
+      </aside>
+    </main>
+
+    <div v-if="detail" class="fixed inset-0 bg-black/40 flex items-start md:items-center justify-center p-4 z-50">
+      <div class="bg-white rounded shadow max-w-4xl w-full max-h-[90vh] overflow-auto">
+        <div class="flex items-center justify-between p-4 border-b">
+          <div class="text-lg font-semibold">{{ detail.name || "(无名称)" }}</div>
+          <div><button @click="detail=null" class="px-3 py-1 border rounded">关闭</button></div>
+        </div>
+        <div class="p-4 grid gap-4 md:grid-cols-3">
+          <div class="md:col-span-2">
+          <div class="mb-4">
+              <div class="text-sm text-gray-600">工厂简介</div>
+              <div class="font-medium text-lg">{{ detail.raw.showroom }}</div>
+<!--              <div class="text-sm text-gray-500 mt-2" v-if="detail.raw.contact_info">{{ detail.raw.contact_info }}</div>-->
+            </div>
+       <div class="mb-4">
+              <div class="text-sm text-gray-600">1688店铺</div>
+                <a :href="detail.raw.shop_url" target="_blank" class="text-blue-600 underline">点击进入</a>
+<!--              <div class="text-sm text-gray-500 mt-2" v-if="detail.raw.contact_info">{{ detail.raw.contact_info }}</div>-->
+            </div>
+
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">联系方式</div>
+              <div class="font-medium text-lg">{{ detail.phone }}</div>
+<!--              <div class="text-sm text-gray-500 mt-2" v-if="detail.raw.contact_info">{{ detail.raw.contact_info }}</div>-->
+            </div>
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">主营目录</div>
+              <div class="font-medium">{{ detail.main_categories }}</div>
+            </div>
+            <div class="mb-4">
+              <div class="text-sm text-gray-600">标签</div>
+              <div>{{ detail.tags }}</div>
+            </div>
+
+<div class="mb-4" v-if="Object.keys(detail.raw).length">
+  <h3 class="font-semibold mb-2">详细信息</h3>
+
+  <!-- 基本信息 -->
+  <div v-if="detail.raw.profile">
+    <h4 class="font-medium mt-2 mb-1">基本信息</h4>
+    <table class="min-w-full text-sm border">
+      <tbody>
+        <tr v-for="(v,k) in parseJson(detail.raw.profile)" :key="'profile-'+k" class="border-t">
+          <td class="py-2 align-top font-medium w-40 text-gray-700">{{ k }}</td>
+          <td class="py-2" v-html="formatValue(v)"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 合作模式 -->
+  <div v-if="detail.raw.cooperation">
+    <h4 class="font-medium mt-4 mb-1">合作模式</h4>
+    <table class="min-w-full text-sm border">
+      <tbody>
+        <tr v-for="(v,k) in parseJson(detail.raw.cooperation)" :key="'coop-'+k" class="border-t">
+          <td class="py-2 align-top font-medium w-40 text-gray-700">{{ k }}</td>
+          <td class="py-2" v-html="formatValue(v)"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 联系方式 -->
+  <div v-if="detail.raw.contact_info">
+    <h4 class="font-medium mt-4 mb-1">联系方式</h4>
+    <table class="min-w-full text-sm border">
+      <tbody>
+        <tr v-for="(v,k) in parseJson(detail.raw.contact_info)" :key="'contact-'+k" class="border-t">
+          <td class="py-2 align-top font-medium w-40 text-gray-700">{{ k }}</td>
+          <td class="py-2" v-html="formatValue(v)"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 验厂报告 -->
+  <div v-if="detail.raw.sgs_report">
+    <h4 class="font-medium mt-4 mb-1">验厂报告</h4>
+    <a :href="detail.raw.sgs_report" target="_blank" class="text-blue-600 underline">点击查看</a>
+  </div>
+</div>
+
+
+
+          </div>
+
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+/* 数据占位符 — 生成时由 Python 替换为 JSON 列表 */
+const data = [{"name": "深圳市雅贝康科技有限公司", "phone": "18938679802", "main_categories": "", "tags": "入围电动牙刷服务榜 第6名|入围电动牙刷实力榜 第1名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2231206651&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=693785035447,664036657403,809164084020,687632837837,687663386063,643565387254,641745760149,757558773500,952615702428,693351970955&aHdkaW5n_isUseGray=true", "name": "深圳市雅贝康科技有限公司", "tags": "入围电动牙刷服务榜 第6名|入围电动牙刷实力榜 第1名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2014.08.26\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"7000m²\",\"员工总数\":\"107人\"}", "cooperation": "{\"定制起订量\":\"1000套\",\"贴牌起订量\":\"100套\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工 包工包料 清加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "公司成立于2013年，是一家专注于口腔护理产品的高新企业。\n公司占地面积10000余平方米，近300名员工，构建了完善的生产体系。有独立的模房，30余台注塑机，60余台植毛机。确保了高效且稳定的生产能力，可充分满足您大规模订单的需求，保障供货时效。\n公司有10多年的OEM、ODM生产经验，自主研发，从产品设计到开模，注塑，刷头植毛，生产组装，质检出货的全流程把控；为了给终端用户体验带来更健康的使用体验，引进了德国先进无铜植毛设备，在产品上精益求精，为您的品牌打造极具竞争力的产品。\n公司通过了ISO9001、IS013485管理体系，CE,FDA,FCC.LFGB等国际权威认证，目前累计国内专利近300余项，荣获“BSCl欧洲认证企业”称号，是国内众多一线品牌指定的合作商.公司秉持“用心做品质，用新赢未来”的理念，我们会不断提升产品品质。\n收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2231206651", "shop_url": "https://shop1409962236300.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"18938679802\",\"传真\":\"暂无\",\"地址\":\"广东东莞深圳市宝安区沙井街道共和社区第三工业区G区E栋\"}", "price": "70+", "remark": "磁悬浮电机，可定制，", "grade": "中高端"}, "price": "70+", "remark": "磁悬浮电机，可定制，", "grade": "中高端"}, {"name": "深圳市宝丽洁科技有限公司", "phone": "18206684240", "main_categories": "主营:|电动牙刷", "tags": "2025上榜三钻工厂|入围电动牙刷服务榜 第13名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=szzhongtaikeji&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=664722253832,672252933643,677150866944,685365978892,631309957384,674430190179,570589419098,693756741388,674644725716,656778937426&aHdkaW5n_isUseGray=true", "name": "深圳市宝丽洁科技有限公司", "tags": "2025上榜三钻工厂|入围电动牙刷服务榜 第13名", "main_categories": "主营:|电动牙刷", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2013.04.18\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"12702m²\",\"员工总数\":\"357人\"}", "cooperation": "{\"定制起订量\":\"1000套\",\"贴牌起订量\":\"1000套\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来图加工 来样加工 包工包料 清加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "深圳市宝丽洁科技，是专注于电动牙刷的研发、设计、制造和销售的综合型厂家，是集电动牙刷头、电动牙刷、个人护理用品、口腔护理用品等专业生产的公司。公司自2013年成立至今，注册投资资金2000万元，拥有独立的模房、注塑部、五金加工、植毛加工和生产组装，厂房面积12000余平方米，现有员工500余人、管理人员50余人。 公司通过CQC、CE、ROHS、FDA、FCC、BSCI、ISO9001-2008等认证，产品拥有国内专利认证， 可为客户提供OEM贴牌， ODM开发等多种服务。我们会根据您订单的大小为您提供更加优惠的价格，欢迎有需求的客户咨询商品的详细优惠政策。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=szzhongtaikeji", "shop_url": "https://szzhongtaikeji.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0755 29872264\",\"手机\":\"18206684240\",\"传真\":\"86 0755 61188938\",\"地址\":\"广东深圳市宝安区沙井街道沙三社区沙三路47号A2、B2、C2、D2、E2、F2\"}", "price": "45+", "remark": "空心电机，可定制", "grade": "中端"}, "price": "45+", "remark": "空心电机，可定制", "grade": "中端"}, {"name": "深圳市萨魔科技有限公司", "phone": "18617135001", "main_categories": "", "tags": "入围电动牙刷实力榜 第6名|入围个护电器配件热度榜 第14名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-40038393615dcfc&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=826767138139,732905990067,940590551189,719575983819,864107729493,801009059901,864791904494,926923523469,824245979578,673122273485&aHdkaW5n_isUseGray=true", "name": "深圳市萨魔科技有限公司", "tags": "入围电动牙刷实力榜 第6名|入围个护电器配件热度榜 第14名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2016.03.30\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"2150m²\",\"员工总数\":\"62人\"}", "cooperation": "{\"定制起订量\":\"1000套\",\"贴牌起订量\":\"1000件\",\"接外贸订单\":\"支持\",\"加工方式\":\"来样加工 来图加工 包工包料\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "深圳市萨魔科技有限公司成立于2016年，是专门从事电动牙刷、牙刷消毒器、冲牙器等口腔清洁产品生产的高新科技企业。拥有员工100余人，其中本科以上工程技术人员8名。\n公司是一个集开发、生产、销售为一体的工贸一体企业，拥有生产车间2000平方米，仓库1000平方米。每月能生产各种产品20万只。\n公司拥有完整和科学的质量管理体系，通过ISO9001体系认证和美国FDA注册。产品通过CE、ROHS、FCC、CMA、KC、EPA、IPX7等各种认证和认证。并拥有30余项各种实用新型和外观专利。\n公司拥有数十款各种声波牙刷、震动牙刷、牙刷消毒盒、冲牙器等产品。品质和服务一直是企业追求的核心。\n公司理念是：感恩做人，敬业做事。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-40038393615dcfc", "shop_url": "https://sarmocare.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0755 23608948\",\"手机\":\"18617135001\",\"传真\":\"暂无\",\"地址\":\"广东省深圳市宝安区宝安区福海街道和平社区和盛工业区3栋2楼\"}", "price": "低端26 中端50+", "remark": "可定制", "grade": "低中高端"}, "price": "低端26 中端50+", "remark": "可定制", "grade": "低中高端"}, {"name": "义乌市帝康电器有限公司", "phone": "18767950937", "main_categories": "", "tags": "入围电动牙刷热度榜 第10名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-220792616759621d23&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=755207756578,619661461712,701429657265,752484244365,744605157584,632597121379,958050795872,670414187294,852919369647,757112218628&aHdkaW5n_isUseGray=true", "name": "义乌市帝康电器有限公司", "tags": "入围电动牙刷热度榜 第10名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2017.08.21\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"500m²\",\"员工总数\":\"18人\"}", "cooperation": "{\"定制起订量\":\"1000个\",\"贴牌起订量\":\"1000件\",\"接外贸订单\":\"支持\",\"加工方式\":\"清加工 来图加工 来样加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "本公司创立于2010年，至今已成立10年历史。公司主要从事电动牙刷 美容仪 蒸脸器 声波洁面仪 黑头仪 超声波导入导出仪 冷热美眼仪 等小家电个护类产品。公司占地面积2000平方，电商办公地400平米。公司追求产品的实际功效和性价比，深受国内外客户敬重，多款产品畅销国内外市场。公司于多家零售商，代理商，外贸商，电商团队建立了长期稳定的合作关系。公司研发团队以用户需求为出发点，开发产品重在满足用户精准需求。公司实力雄厚，讲信用  守合同 保质保量和完善的售后服务。以多种经营特色和薄利多销的原则，赢得了广大老客户的信任收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-220792616759621d23", "shop_url": "https://dikangdianqi.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0579 85184552\",\"手机\":\"18767950937\",\"传真\":\"86 0579 85184552\",\"地址\":\"义乌市江东街道东苑工业区通宝路246号C栋2楼\"}", "price": "儿童12左右 成人15左右", "remark": "价格便宜，小厂", "grade": "低端产品"}, "price": "儿童12左右 成人15左右", "remark": "价格便宜，小厂", "grade": "低端产品"}, {"name": "宁波创禾电子科技有限公司", "phone": "15867277892", "main_categories": "主营:|电动牙刷|冲牙器|个护电器配件", "tags": "2025上榜一钻工厂|入围冲牙器实力榜 第13名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2207628094315d5ecd&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=675010534667,702304808992,693971791563,717563250852,633430875180,712369222757,726605083514,693963423069,693122616014,674308172834&aHdkaW5n_isUseGray=true", "name": "宁波创禾电子科技有限公司", "tags": "2025上榜一钻工厂|入围冲牙器实力榜 第13名", "main_categories": "主营:|电动牙刷|冲牙器|个护电器配件", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2014.08.29\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"5200m²\",\"员工总数\":\"45人\"}", "cooperation": "{\"定制起订量\":\"100套\",\"贴牌起订量\":\"100套\",\"接外贸订单\":\"支持\",\"加工方式\":\"来样加工 来图加工 包工包料\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "宁波创禾电子科技有限公司成立于2014年，注册资金500万人民币，是一家集设计、研发、生产、销售为一体的高科技企业，专注研发生产声波电动牙刷。\n    本公司生产的声波电动牙刷符合CE,ROHS等国际标准。工厂面积7000平方米，员工人数200人，工厂通过管理体系ISO认证。公司拥有30台先进注塑机，5超声机，40台数控机，5台植毛机 ，生产流水线15条，上千套模具。 研发部有外观设计师，机构工程师，软硬件工程师，电子工程师，测试工程师等组成的经验丰富专家团队，先后获得外观专利、实用新型专利和发明专利等多项专利。以诚信、创新、质量获得全球众多OEM/ODM品牌客户认可和青睐。欢迎各界朋友莅临参观、指导和业务洽谈。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2207628094315d5ecd", "shop_url": "https://nbchuanghe.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"15867277892\",\"传真\":\"暂无\",\"地址\":\"浙江省宁波市宁海县浙江省宁波市宁海县深甽镇深甽村新西山线\"}", "price": "低端17+  中端50+", "remark": "", "grade": "低中端"}, "price": "低端17+  中端50+", "remark": "", "grade": "低中端"}, {"name": "深圳市盛科创新科技有限公司", "phone": "18820158759", "main_categories": "主营:|电动牙刷|冲牙器", "tags": "2025上榜一钻工厂|入围冲牙器新晋榜 第12名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-2219852471463e5bd7&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=939673405031,939626833701,947697126582,948860608769,948134025583,938136190973,938585987887,937150531061,938130598818,938761541385&aHdkaW5n_isUseGray=true", "name": "深圳市盛科创新科技有限公司", "tags": "2025上榜一钻工厂|入围冲牙器新晋榜 第12名", "main_categories": "主营:|电动牙刷|冲牙器", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2016.05.13\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"2500m²\",\"员工总数\":\"33人\"}", "cooperation": "{\"定制起订量\":\"1个\",\"贴牌起订量\":\"1个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"清加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "深圳市盛科创新科技有限公司是一家集研发，生产，销售为一体的高新技术企业，主要产品有声波牙刷、电动牙刷、冲牙器、牙刷消毒器产品。盛科创新立足中国，面向世界，吸收中西方进理念，并结合自身技术优势，不断探索口腔护理新技术，开发适合市场的产品，产品均获得北美UL, 欧洲CE、GS等多项国际安全认证和多项技术专利，并通过FDA注册，产品远销美国、加拿大、日本、英国，法国，德国、西班牙、俄罗斯等30多个和地区。 优势 强大的研发团队，不断探索新技术，开发适合市场的产品。 与世界先腔护理潮流同步，公司建成9年来服务于世界众多。 工厂与产品拥有完整的认证体系，通过ISO13485、ISO9001、FDA、FCC、RoHs和其他国际认证。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-2219852471463e5bd7", "shop_url": "https://shop4257hr78405s9.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"18820158759\",\"传真\":\"暂无\",\"地址\":\"广东省深圳市宝安区福海街道和平社区晖信工业园C栋2楼\"}", "price": "低端10+", "remark": "性价比高，小厂", "grade": "低中端"}, "price": "低端10+", "remark": "性价比高，小厂", "grade": "低中端"}, {"name": "东莞市艾乐智能科技有限公司", "phone": "18923701542", "main_categories": "主营:|电动牙刷|冲牙器|个护电器配件", "tags": "2025上榜一钻工厂|入围电动牙刷实力榜 第20名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-3325744355feef4&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=924234286271,922837431544,923211986447,923332331736,955631922550,923116370155,924212444521,926912721670,923771469328,922778267662&aHdkaW5n_isUseGray=true", "name": "东莞市艾乐智能科技有限公司", "tags": "2025上榜一钻工厂|入围电动牙刷实力榜 第20名", "main_categories": "主营:|电动牙刷|冲牙器|个护电器配件", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2017.04.18\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"4950m²\",\"员工总数\":\"36人\"}", "cooperation": "{\"定制起订量\":\"2000套\",\"贴牌起订量\":\"3000套\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来样加工 来图加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "东莞市艾乐智能科技有限公司，2017年成立于中国东莞，公司位于广东省东莞市凤岗镇浸校塘环村路中顶工业园，周边风景秀丽，产业配套完善。公司现有厂房6000-多平方米，员工100余人 拥有100多平方米的专业化实验室多位专业的研发人员，不断创新，开发一系列新产品。已取得50多项专利。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-3325744355feef4", "shop_url": "https://aleokeji.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"18923701542\",\"传真\":\"暂无\",\"地址\":\"广东省东莞市凤岗镇浸校塘环村路53号2栋7楼\"}", "price": "30+", "remark": "只有成人牙刷", "grade": "中端"}, "price": "30+", "remark": "只有成人牙刷", "grade": "中端"}, {"name": "温州昶宏电子科技有限公司", "phone": "13353390655", "main_categories": "主营:|电动牙刷|冲牙器|牙刷", "tags": "2025上榜三钻工厂|入围冲牙器服务榜 第4名", "images": ["https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png"], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=b2b-220662533195100abd&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=970924092219,848849350630,851952459617,834574732031,846563129050,845624728461,855275716384,850798879089,848298249143,846911334365&aHdkaW5n_isUseGray=true", "name": "温州昶宏电子科技有限公司", "tags": "2025上榜三钻工厂|入围冲牙器服务榜 第4名", "main_categories": "主营:|电动牙刷|冲牙器|牙刷", "honors": "https://img.alicdn.com/imgextra/i3/O1CN01Pelhv624HDt03gZ6K_!!6000000007365-2-tps-160-40.png", "profile": "{\"成立时间\":\"2019.08.01\",\"年交易额\":\"2000万以上\",\"工厂面积\":\"20800m²\",\"员工总数\":\"97人\"}", "cooperation": "{\"定制起订量\":\"200个\",\"贴牌起订量\":\"2000件\",\"接外贸订单\":\"支持\",\"加工方式\":\"来图加工 来样加工 包工包料 清加工\",\"开票点数\":\"10%\",\"增值税发票\":\"有\"}", "showroom": "温州昶宏电子科技有限公司成立于2019年，是一家集研发、生产、销售于一体的新型科技企业，主营电动牙刷、冲牙器等口腔护理产品。\n公司具有雄厚的技术研发力量和强大的生产制造能力，拥有数十项国内外专利，现有厂房面积20800平方米，员工100余人，年产数百万套电动牙刷及冲牙器。经过多年的市场开拓，我们的产品广销全球，并形成了完善的线上线下销售网络。\n公司秉持“安全第一，以人为本，精诚合作，锐意进取”的企业精神，始终遵循一切服务于客户的价值观，以市场需求为导向，以提供高品质产品为目标，致力于成为行业领先制造商。收起更多", "sgs_report": "https://r.1688.com/auth/fcaReport.htm?_input_charset=GBK&showReport=true&mid=b2b-220662533195100abd", "shop_url": "https://shop13s0105218054.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"暂无\",\"手机\":\"13353390655\",\"传真\":\"暂无\",\"地址\":\"浙江省温州市平阳县万全镇瑞鸟电商产业园#12号楼#11号楼\"}", "price": "低端19+ 中端39+", "remark": "", "grade": "低中端"}, "price": "低端19+ 中端39+", "remark": "", "grade": "低中端"}, {"name": "宁波千百媚电器有限公司", "phone": "13567439712", "main_categories": "", "tags": "入围冲牙器服务榜 第8名", "images": [], "raw": {"factory_card_url": "https://sale.1688.com/factory/card.html?memberId=nbqianbaimei&aHdkaW5n_isCentral=true&aHdkaW5n_isGrayed=false&topOfferIds=641815352594,661357541872,641758056243,642198513398,642842414212,642957727997,641769512149,662922790706,597833534638,588601986076&aHdkaW5n_isUseGray=true", "name": "宁波千百媚电器有限公司", "tags": "入围冲牙器服务榜 第8名", "main_categories": "", "honors": "", "profile": "{\"成立时间\":\"2011.03.09\",\"年交易额\":\"1000万~2000万\",\"员工总数\":\"11~50人\"}", "cooperation": "{\"定制起订量\":\"500个\",\"贴牌起订量\":\"500个\",\"接外贸订单\":\"不支持\",\"加工方式\":\"来样加工\",\"开票点数\":\"13%\",\"增值税发票\":\"有\"}", "showroom": "宁波千百媚电器有限公司创建于2011年3月，公司定位为一家专注于电动牙刷及口腔健康周边产品的研发、生产、品牌建设、渠道推广于一体的品牌型厂家。\n      立足高品质，以自有品牌“QBM千百媚”“Iclean”为依托，构建产销一体化运营平台。我们深信，只有生产厂家离消费者越近，对品质的理解就越深。历经多年发展，公司现有生产厂房3800平，年生产电动牙刷160万套，拥有完善的生产及检测设备，以及高标准的质量管理体系。 通过了GB/T9001-2008/ISO 9001-2008质量管理体系认证以及多家知名品牌的三方认证，累计取得专利30余项，具备为国内外品牌客户服务的能力。欢迎海内外客户莅临指导，合作洽谈。收起更多", "sgs_report": "", "shop_url": "https://nbqianbaimei.1688.com/", "shop_categories": "", "contact_info": "{\"公司名称\":null,\"电话\":\"86 0574 88879212/88879211/88879213\",\"手机\":\"13567439712\",\"传真\":\"86 0574 88879211\",\"地址\":\"浙江省宁波市奉化区溪口镇大岙气动工业区兴佳路10号\"}", "price": "15+", "remark": "", "grade": "低中端"}, "price": "15+", "remark": "", "grade": "低中端"}];
+
+const app = Vue.createApp({
+  data(){ return {
+    q: '',
+    raw: data,
+    page: 1,
+    perPage: 20,
+    hasImage: false,
+    detail: null
+  }},
+  computed: {
+    filtered(){
+      let q = this.q.trim().toLowerCase();
+      let arr = this.raw.slice();
+      if(this.hasImage) arr = arr.filter(x=>x.images && x.images.length);
+      if(q){
+        arr = arr.filter(f=>{
+          return (f.name||'').toLowerCase().includes(q)
+            || (f.main_categories||'').toLowerCase().includes(q)
+            || (f.tags||'').toLowerCase().includes(q)
+            || (f.phone||'').toLowerCase().includes(q);
+        });
+      }
+      return arr;
+    },
+    pages(){ return Math.max(1, Math.ceil(this.filtered.length / this.perPage)); },
+    paged(){ return this.filtered.slice((this.page-1)*this.perPage, this.page*this.perPage); }
+  },
+  methods:{
+    openDetail(f){ this.detail = f; window.scrollTo(0,0); },
+    prevPage(){ if(this.page>1) this.page--; },
+    nextPage(){ if(this.page<this.pages) this.page++; },
+    formatValue(v){
+      if(v===null || v===undefined || v==='') return '<span class="text-gray-400">—</span>';
+      let s = String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      s = s.replace(/(https?:\/\/[^\s,;]+)/g, '<a href="$1" target="_blank" class="text-blue-600 underline">$1</a>');
+      s = s.replace(/\n/g,'<br/>');
+      return s;
+    },
+      parseJson(str){
+    try{
+      const obj = JSON.parse(str);
+      if(typeof obj === 'object' && obj !== null){
+        return obj;
+      }
+    }catch(e){}
+    return { 原文: str };
+  },
+  filteredOtherFields(raw){
+    const skipKeys = [
+      'factory_card_url','name','tags','honors','showroom','shop_url',
+      'profile','cooperation','sgs_report','contact_info'
+    ];
+    const out = {};
+    for(const [k,v] of Object.entries(raw)){
+      if(skipKeys.includes(k)) continue;
+      if(k === 'main_categories' && !v) continue;
+      out[k] = v;
+    }
+    return out;
+  }
+  },
+  watch:{
+    perPage(){ this.page = 1; },
+    q(){ this.page = 1; }
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
